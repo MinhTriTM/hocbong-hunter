@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Học bổng Hunter — Săn học bổng bằng AI</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <h1>🎓 Học bổng Hunter</h1>
+    <p class="tagline">Trợ lý AI săn học bổng cho sinh viên Việt Nam — chạy bằng <strong>Meta Muse Spark</strong></p>
+  </div>
+</header>
+
+<main>
+  <!-- API key -->
+  <section class="card" id="key-card">
+    <h2>1. API key</h2>
+    <p class="muted">Dán Meta Model API key của bạn. Key chỉ lưu trong trình duyệt, không gửi đi đâu khác.</p>
+    <div class="row">
+      <input type="password" id="api-key" placeholder="LLM|..." autocomplete="off">
+      <button id="save-key" class="btn">Lưu key</button>
+    </div>
+    <p class="muted small">Nhận $150 credit tại form của hackathon, hoặc $20 miễn phí khi đăng ký tại <a href="https://dev.meta.ai" target="_blank" rel="noopener">dev.meta.ai</a>.</p>
+    <p id="key-status" class="status"></p>
+  </section>
+
+  <!-- Profile -->
+  <section class="card">
+    <h2>2. Hồ sơ của bạn</h2>
+    <div class="grid">
+      <label>Bậc học
+        <select id="f-level">
+          <option>Đại học</option>
+          <option>Cao đẳng</option>
+          <option>THPT</option>
+          <option>Sau đại học</option>
+        </select>
+      </label>
+      <label>Ngành học
+        <input type="text" id="f-major" placeholder="VD: Công nghệ thông tin">
+      </label>
+      <label>GPA (thang 4.0)
+        <input type="text" id="f-gpa" placeholder="VD: 3.4">
+      </label>
+      <label>Năm học
+        <input type="text" id="f-year" placeholder="VD: Năm 2">
+      </label>
+    </div>
+    <label>Loại học bổng quan tâm</label>
+    <div class="chips" id="f-types">
+      <label class="chip"><input type="checkbox" value="toàn phần" checked> Toàn phần</label>
+      <label class="chip"><input type="checkbox" value="bán phần" checked> Bán phần</label>
+      <label class="chip"><input type="checkbox" value="trao đổi quốc tế" checked> Trao đổi quốc tế</label>
+      <label class="chip"><input type="checkbox" value="trong nước"> Trong nước</label>
+      <label class="chip"><input type="checkbox" value="hỗ trợ hoàn cảnh khó khăn"> Hoàn cảnh khó khăn</label>
+    </div>
+    <label>Hoàn cảnh / điểm mạnh đặc biệt (không bắt buộc)
+      <textarea id="f-notes" rows="2" placeholder="VD: hộ nghèo, dân tộc thiểu số, có giải NCKH, IELTS 7.0..."></textarea>
+    </label>
+    <button id="hunt" class="btn primary big">🔍 Săn học bổng ngay</button>
+  </section>
+
+  <!-- Pipeline -->
+  <section class="card hidden" id="pipeline-card">
+    <h2>3. Pipeline agent đang chạy</h2>
+    <ol class="steps">
+      <li id="st-1"><span class="dot"></span><div><strong>Researcher</strong><p>Tìm học bổng đang mở trên web (Muse Spark + web search grounding)</p></div></li>
+      <li id="st-2"><span class="dot"></span><div><strong>Extractor</strong><p>Bóc tách thông tin có cấu trúc: giá trị, deadline, điều kiện</p></div></li>
+      <li id="st-3"><span class="dot"></span><div><strong>Matcher</strong><p>Chấm điểm phù hợp với hồ sơ của bạn (0–100)</p></div></li>
+      <li id="st-4"><span class="dot"></span><div><strong>Drafter</strong><p>Soạn dàn ý thư động lực + checklist hồ sơ cho học bổng top 1</p></div></li>
+    </ol>
+    <p id="pipe-msg" class="status"></p>
+  </section>
+
+  <!-- Results -->
+  <section class="card hidden" id="results-card">
+    <h2>4. Kết quả <span id="res-count" class="muted"></span></h2>
+    <p class="muted small">⚠️ AI tổng hợp từ web — hãy xác minh lại trên trang chính thức trước khi nộp hồ sơ.</p>
+    <div id="results"></div>
+  </section>
+
+  <!-- Letter -->
+  <section class="card hidden" id="letter-card">
+    <h2>5. Dàn ý thư động lực + checklist <span id="letter-for" class="muted"></span></h2>
+    <div id="letter" class="letter"></div>
+    <div class="row">
+      <button id="copy-letter" class="btn">📋 Copy dàn ý</button>
+      <button id="dl-json" class="btn">⬇️ Tải JSON kết quả</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built for the Meta Global AI Developer Hackathon · Powered by Meta Muse Spark (Meta Model API)</p>
+</footer>
+
+<script src="js/app.js"></script>
+</body>
+</html>
