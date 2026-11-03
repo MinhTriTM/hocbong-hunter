@@ -1,261 +1,166 @@
-/**
- * Hoc bong Hunter — agentic pipeline on Meta Muse Spark (Meta Model API).
- * 4 agents: Researcher (Responses API + web_search grounding) -> Extractor
- * -> Matcher -> Drafter (Chat Completions). API key lives in localStorage only.
- */
-const API_BASE = 'https://api.meta.ai/v1';
-const MODEL = 'muse-spark-1.3';
-const KEY_NAME = 'hbhunter_meta_key';
-
+/* Điều khiển UI v2: key → profile → Supervisor → fan-out 3 Researchers →
+ * merge (code) → Extractor → Critic → Matcher → Drafter, với flowchart live. */
 const $ = (id) => document.getElementById(id);
-const state = { key: '', raw: '', scholarships: [], ranked: [], letter: '' };
+const KEY_LS = "hbh_meta_api_key";
+let fc = null;
 
-/* ---------------- API ---------------- */
-
-function getKey() {
-  try { return localStorage.getItem(KEY_NAME) || ''; } catch (e) { return ''; }
-}
-
-/** Responses API — the only Meta endpoint with web_search grounding. */
-async function callResponses(input, maxOutput = 2500) {
-  const res = await fetch(API_BASE + '/responses', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.key },
-    body: JSON.stringify({
-      model: MODEL,
-      input: input,
-      tools: [{ type: 'web_search' }],
-      max_output_tokens: maxOutput
-    })
+function status(t) { $("stepStatus").textContent = t; }
+function fail(msg) {
+  $("error").textContent = "❌ " + msg;
+  Object.keys(fc ? fc.nodeEls : {}).forEach(id => {
+    const g = fc.nodeEls[id];
+    if (g.getAttribute("class").includes("running")) fc.setState(id, "failed");
   });
-  if (!res.ok) throw new Error('API ' + res.status);
-  const data = await res.json();
-  return extractResponsesText(data);
+  $("hunt").disabled = false;
 }
 
-/** Walk the Responses API output array defensively and concat text parts. */
-function extractResponsesText(data) {
-  const out = data && data.output;
-  if (!Array.isArray(out)) {
-    if (typeof data.output_text === 'string') return data.output_text;
-    throw new Error('unexpected-responses-shape');
-  }
-  const parts = [];
-  for (const item of out) {
-    if (!item || !item.content) continue;
-    const blocks = Array.isArray(item.content) ? item.content : [item.content];
-    for (const b of blocks) {
-      if (typeof b === 'string') parts.push(b);
-      else if (b && typeof b.text === 'string') parts.push(b.text);
-    }
-  }
-  const text = parts.join('\n').trim();
-  if (!text) throw new Error('empty-response');
-  return text;
+// --- API key ---
+function refreshKeyStatus() {
+  const k = localStorage.getItem(KEY_LS);
+  $("keyStatus").textContent = k ? "Đã có key (lưu trong trình duyệt này)." : "Chưa có key.";
+  if (k) $("apiKey").value = k;
 }
+$("saveKey").onclick = () => {
+  const v = $("apiKey").value.trim();
+  if (!v) { $("keyStatus").textContent = "Key trống — chưa lưu."; return; }
+  localStorage.setItem(KEY_LS, v);
+  $("keyStatus").textContent = "Đã lưu key vào trình duyệt. Không gửi đi đâu ngoài api.meta.ai khi bạn bấm Săn.";
+};
+refreshKeyStatus();
+fc = new Flowchart($("flowsvg"), $("flowlog"));
 
-/** Chat Completions — OpenAI-compatible, for structured follow-up agents. */
-async function callChat(system, user, maxTokens = 2000) {
-  const res = await fetch(API_BASE + '/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.key },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user }
-      ],
-      max_tokens: maxTokens,
-      temperature: 0.4
-    })
-  });
-  if (!res.ok) throw new Error('API ' + res.status);
-  const data = await res.json();
-  const c = data.choices && data.choices[0];
-  const text = c && c.message && c.message.content;
-  if (!text || !text.trim()) throw new Error('empty-response');
-  return text.trim();
-}
+// --- Main flow v2 ---
+$("hunt").onclick = async () => {
+  $("error").textContent = "";
+  const apiKey = (localStorage.getItem(KEY_LS) || "").trim();
+  if (!apiKey) { fail("Chưa có API key. Dán key ở ô phía trên rồi bấm Lưu key."); return; }
+  const p = {
+    level: $("level").value, major: $("major").value.trim(), gpa: $("gpa").value.trim(),
+    year: $("year").value.trim(), english: $("english").value.trim(), kind: $("kind").value,
+    countries: $("countries").value.trim(), note: $("note").value.trim(),
+  };
+  if (!p.major || !p.gpa) { fail("Điền ngành học và GPA trước đã."); return; }
 
-/** Extract the first JSON array/object from a model reply. */
-function extractJSON(text) {
-  const fenced = text.match(/```json\s*([\s\S]*?)```/i) || text.match(/```\s*([\s\S]*?)```/);
-  const cand = fenced ? fenced[1] : text;
-  const start = cand.search(/[\[{]/);
-  if (start < 0) throw new Error('no-json');
-  let depth = 0, inStr = false, esc = false, end = -1;
-  const open = cand[start];
-  const close = open === '[' ? ']' : '}';
-  for (let i = start; i < cand.length; i++) {
-    const ch = cand[i];
-    if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; }
-    else if (ch === '"') inStr = true;
-    else if (ch === '[' || ch === '{') depth++;
-    else if (ch === ']' || ch === '}') { depth--; if (depth === 0 && ch === close) { end = i; break; } }
-  }
-  if (end < 0) throw new Error('no-json');
-  return JSON.parse(cand.slice(start, end + 1));
-}
+  $("hunt").disabled = true;
+  fc.reset();
+  ["pipeline-card", "results-card", "letter-card"].forEach(id => $(id).classList.remove("hidden"));
+  $("results").innerHTML = ""; $("letter").textContent = "";
+  const ctl = new AbortController();
 
-/* ---------------- Pipeline ---------------- */
-
-function profileText() {
-  const types = [...document.querySelectorAll('#f-types input:checked')].map(e => e.value).join(', ');
-  const notes = $('f-notes').value.trim();
-  return [
-    'Bậc học: ' + $('f-level').value,
-    'Ngành: ' + ($('f-major').value.trim() || 'chưa rõ'),
-    'GPA: ' + ($('f-gpa').value.trim() || 'chưa rõ'),
-    'Năm học: ' + ($('f-year').value.trim() || 'chưa rõ'),
-    'Loại học bổng quan tâm: ' + (types || 'mọi loại')
-  ].join('\n') + (notes ? '\nĐiểm đặc biệt: ' + notes : '');
-}
-
-function setStep(n, cls) {
-  const el = $('st-' + n);
-  el.classList.remove('active', 'done');
-  if (cls) el.classList.add(cls);
-}
-function say(msg, cls) {
-  const el = $('pipe-msg');
-  el.textContent = msg;
-  el.className = 'status' + (cls ? ' ' + cls : '');
-}
-
-async function runPipeline() {
-  if (!state.key) { say('Bạn cần lưu API key trước.', 'err'); return; }
-  $('pipeline-card').classList.remove('hidden');
-  $('results-card').classList.add('hidden');
-  $('letter-card').classList.add('hidden');
-  [1, 2, 3, 4].forEach(n => setStep(n));
-  $('hunt').disabled = true;
-
-  const profile = profileText();
   try {
-    // 1. Researcher — web-grounded search
-    setStep(1, 'active'); say('Researcher đang tìm học bổng đang mở trên web...');
-    state.raw = await callResponses(
-      'Bạn là trợ lý săn học bổng cho sinh viên Việt Nam.\nHồ sơ ứng viên:\n' + profile +
-      '\n\nHãy tìm trên web các học bổng HIỆN ĐANG MỞ (năm 2026) phù hợp với hồ sơ trên. ' +
-      'Liệt kê tối đa 8 học bổng, mỗi cái gồm: tên học bổng, tổ chức cấp, quốc gia, giá trị, ' +
-      'hạn nộp (deadline), 2-3 điều kiện chính, và link trang chính thức. ' +
-      'Ưu tiên nguồn chính thức (trang .edu, .gov, website tổ chức). ' +
-      'Trả lời bằng tiếng Việt, ngắn gọn, kèm citation cho từng mục.'
-    );
-    setStep(1, 'done');
+    // 1) SUPERVISOR — chia 3 hướng tìm kiếm theo hồ sơ
+    fc.setState("profile", "done");
+    fc.setState("supervisor", "running");
+    fc.log("🧠 Supervisor: phân tích hồ sơ, chia 3 hướng tìm kiếm…");
+    status("Supervisor — đang lên kế hoạch 3 hướng tìm kiếm…");
+    const lanes = await AgentsV2.supervise(apiKey, p, ctl.signal);
+    lanes.forEach((l, i) => fc.setLabel(["r1", "r2", "r3"][i], l.title));
+    fc.setState("supervisor", "done");
+    fc.log("🧠 Supervisor: chốt 3 lane → " + lanes.map(l => l.title).join(" | "));
 
-    // 2. Extractor — structured JSON
-    setStep(2, 'active'); say('Extractor đang bóc tách thông tin...');
-    state.scholarships = await extractJSON(await callChat(
-      'Bạn trích xuất thông tin thành JSON. Chỉ trả về JSON, không giải thích.',
-      'Từ danh sách học bổng sau, trích xuất thành mảng JSON, mỗi phần tử có đúng các trường: ' +
-      '{"name": "...", "org": "...", "country": "...", "amount": "...", "deadline": "...", ' +
-      '"requirements": ["...", "..."], "link": "..."}. ' +
-      'Nếu thiếu thông tin, ghi "chưa rõ". Danh sách:\n\n' + state.raw
-    ));
-    if (!Array.isArray(state.scholarships) || !state.scholarships.length) throw new Error('no-scholarships');
-    setStep(2, 'done');
+    // 2) FAN-OUT — 3 Researchers chạy song song
+    status("3 Researchers — đang tìm song song trên web…");
+    const lanePromises = lanes.map(async (lane, i) => {
+      const nid = ["r1", "r2", "r3"][i];
+      fc.setState(nid, "running");
+      fc.log(`🔎 ${lane.title}: bắt đầu tìm (web search grounding)…`);
+      try {
+        const text = await AgentsV2.researchLane(apiKey, p, lane, ctl.signal);
+        fc.setState(nid, "done");
+        fc.log(`🔎 ${lane.title}: xong (~${Math.round(text.length / 100) / 10}k ký tự).`);
+        return { lane, ok: true, text };
+      } catch (e) {
+        fc.setState(nid, "failed");
+        fc.log(`🔎 ${lane.title}: LỖI — ${e.message}`);
+        return { lane, ok: false, text: "" };
+      }
+    });
+    const laneResults = await Promise.all(lanePromises);
+    if (!laneResults.some(r => r.ok)) throw new Error("Cả 3 researcher đều lỗi — kiểm tra key/API rồi thử lại.");
 
-    // 3. Matcher — score fit
-    setStep(3, 'active'); say('Matcher đang chấm điểm phù hợp...');
-    const scores = await extractJSON(await callChat(
-      'Bạn chấm điểm phù hợp. Chỉ trả về JSON, không giải thích.',
-      'Hồ sơ ứng viên:\n' + profile + '\n\nDanh sách học bổng (JSON):\n' +
-      JSON.stringify(state.scholarships) +
-      '\n\nChấm điểm phù hợp 0-100 cho từng học bổng, trả về mảng JSON: ' +
-      '[{"name": "...", "score": 85, "reason": "..."}]. "reason" tối đa 1 câu tiếng Việt.'
-    ));
-    const scoreMap = {};
-    scores.forEach(s => { scoreMap[s.name] = s; });
-    state.ranked = state.scholarships.map(s => ({
-      ...s,
-      score: (scoreMap[s.name] && scoreMap[s.name].score) || 0,
-      reason: (scoreMap[s.name] && scoreMap[s.name].reason) || ''
-    })).sort((a, b) => b.score - a.score);
-    setStep(3, 'done');
+    // 3) FAN-IN — gộp + khử trùng bằng code (không tốn AI)
+    fc.setState("merge", "running"); status("Merge — gộp kết quả 3 lane…");
+    const { merged, okCount } = AgentsV2.mergeLanes(laneResults);
+    fc.setState("merge", "done");
+    fc.log(`🔀 Merge: gộp ${okCount}/3 lane bằng code (không tốn token AI).`);
 
-    // 4. Drafter — letter outline + checklist for top 1
-    setStep(4, 'active'); say('Drafter đang soạn dàn ý thư động lực...');
-    const top = state.ranked[0];
-    state.letter = await callChat(
-      'Bạn là cố vấn viết hồ sơ học bổng. Trả lời bằng tiếng Việt, trình bày rõ ràng.',
-      'Hồ sơ ứng viên:\n' + profile + '\n\nHọc bổng mục tiêu: ' + top.name +
-      ' (' + top.org + ', giá trị: ' + top.amount + ', deadline: ' + top.deadline + ').\n\n' +
-      'Hãy soạn: (1) dàn ý thư động lực 5-7 gạch đầu dòng, cá nhân hoá theo hồ sơ; ' +
-      '(2) checklist hồ sơ cần chuẩn bị (giấy tờ, chứng chỉ, thời hạn).'
-    );
-    state.letterFor = top.name;
-    setStep(4, 'done');
+    // 4) EXTRACTOR
+    fc.setState("extractor", "running"); status("Extractor — bóc deadline, điều kiện, link…");
+    fc.log("🧾 Extractor: bóc JSON từ text gộp…");
+    const list = await AgentsV2.extract(apiKey, merged, ctl.signal);
+    if (!list.length) throw new Error("Không trích được học bổng nào — thử lại.");
+    fc.setState("extractor", "done");
+    fc.log(`🧾 Extractor: ${list.length} học bổng (đã khử trùng).`);
 
-    renderResults();
-    say('Xong! Tìm thấy ' + state.ranked.length + ' học bổng.', 'ok');
+    // 5) CRITIC — fresh context, loại tin dỏm
+    fc.setState("critic", "running"); status("Critic — kiểm định độc lập…");
+    fc.log("🛡️ Critic (fresh context, không thấy hồ sơ): kiểm tra deadline/link/tên…");
+    const { approved, rejected } = await AgentsV2.critic(apiKey, list, ctl.signal);
+    fc.setState("critic", "done");
+    if (rejected.length) {
+      fc.log(`🛡️ Critic: LOẠI ${rejected.length} tin → ` +
+        rejected.map(r => `${r.name} (${r.rejectReason})`).join(" | "));
+    } else {
+      fc.log("🛡️ Critic: tất cả đều qua kiểm định.");
+    }
+    const pool = approved.length >= 3 ? approved
+      : approved.length ? approved
+      : (fc.log("🛡️ Critic: không chắc chắn — giữ nguyên, bạn xác minh tay nhé."), list);
+
+    // 6) MATCHER
+    fc.setState("matcher", "running"); status("Matcher — chấm điểm phù hợp…");
+    fc.log("📊 Matcher: chấm 0–100 theo hồ sơ…");
+    const ranked = await AgentsV2.rank(apiKey, p, pool, ctl.signal);
+    fc.setState("matcher", "done");
+    fc.log(`📊 Matcher: top 1 = ${ranked[0] ? ranked[0].name + " (" + ranked[0].score + "đ)" : "?"}.`);
+    renderResults(ranked, rejected);
+
+    // 7) DRAFTER
+    fc.setState("drafter", "running"); status("Drafter — soạn dàn ý thư động lực…");
+    fc.log("✍️ Drafter: viết dàn ý thư cho top 1…");
+    const letter = await AgentsV2.draftLetter(apiKey, p, ranked[0], ctl.signal);
+    fc.setState("drafter", "done");
+    $("letterFor").textContent = "cho: " + ranked[0].name;
+    $("letter").textContent = letter;
+
+    fc.setState("done", "done");
+    fc.log("✅ Xong toàn bộ pipeline 7 agent.");
+    status("Xong! " + usageHint());
   } catch (e) {
-    say('Lỗi ở pipeline: ' + e.message + '. Hãy kiểm tra API key và thử lại.', 'err');
+    fail(e.message || String(e));
+  } finally {
+    $("hunt").disabled = false;
   }
-  $('hunt').disabled = false;
-}
+};
 
-/* ---------------- Render ---------------- */
+function renderResults(ranked, rejected) {
+  let html = ranked.map((s, i) => `
+    <div class="sch">
+      <h3>#${i + 1} ${esc(s.name)}</h3>
+      <div class="meta">
+        <span class="score">${s.score ?? "?"} điểm</span>
+        <span class="tag">${esc(s.org || "")}</span>
+        <span class="tag">${esc(s.country || "")}</span>
+        <span class="tag">⏰ ${esc(s.deadline || "chưa rõ")}</span>
+        ${s.value ? `<span class="tag">💰 ${esc(s.value)}</span>` : ""}
+      </div>
+      ${s.reason ? `<p><b>Vì sao hợp:</b> ${esc(s.reason)}</p>` : ""}
+      ${s.conditions ? `<p><b>Điều kiện:</b> ${esc(s.conditions)}</p>` : ""}
+      ${s.link ? `<p><a href="${esc(s.link)}" target="_blank" rel="noopener">🔗 Nguồn / nộp hồ sơ</a></p>` : ""}
+    </div>`).join("");
+  if (rejected && rejected.length) {
+    html += `<details class="critic-rejected"><summary>🛡️ ${rejected.length} tin bị Critic loại (bấm để xem lý do)</summary>` +
+      rejected.map(r => `<p><b>${esc(r.name)}</b> — ${esc(r.rejectReason || "")}</p>`).join("") + `</details>`;
+  }
+  $("results").innerHTML = html;
+}
 
 function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-function renderResults() {
-  $('results-card').classList.remove('hidden');
-  $('res-count').textContent = '(' + state.ranked.length + ')';
-  const box = $('results');
-  box.innerHTML = '';
-  state.ranked.forEach(s => {
-    const d = document.createElement('div');
-    d.className = 'sch';
-    d.innerHTML =
-      '<h3>' + esc(s.name) + '</h3>' +
-      '<div class="meta">' +
-      '<span class="pill score">Phù hợp: ' + esc(s.score) + '/100</span>' +
-      '<span class="pill">' + esc(s.org) + '</span>' +
-      '<span class="pill">' + esc(s.amount) + '</span>' +
-      '<span class="pill deadline">Hạn: ' + esc(s.deadline) + '</span>' +
-      '</div>' +
-      (s.reason ? '<p class="muted small">→ ' + esc(s.reason) + '</p>' : '') +
-      '<ul>' + (s.requirements || []).map(r => '<li>' + esc(r) + '</li>').join('') + '</ul>' +
-      (s.link && s.link !== 'chưa rõ' ? '<p class="small"><a href="' + esc(s.link) + '" target="_blank" rel="noopener">🔗 Trang chính thức (xác minh lại trước khi nộp)</a></p>' : '');
-    box.appendChild(d);
-  });
-  $('letter-card').classList.remove('hidden');
-  $('letter-for').textContent = 'cho: ' + state.letterFor;
-  $('letter').textContent = state.letter;
-}
-
-/* ---------------- Wire up ---------------- */
-
-function refreshKeyStatus() {
-  const has = !!getKey();
-  const el = $('key-status');
-  el.textContent = has ? '✓ Đã lưu key.' : 'Chưa có key.';
-  el.className = 'status ' + (has ? 'ok' : '');
-  if (has) $('api-key').value = '';
-}
-
-$('save-key').onclick = () => {
-  const v = $('api-key').value.trim();
-  if (!v) return;
-  try { localStorage.setItem(KEY_NAME, v); } catch (e) { /* ignore */ }
-  state.key = v;
-  refreshKeyStatus();
+$("copyLetter").onclick = async () => {
+  try { await navigator.clipboard.writeText($("letter").textContent); $("copyLetter").textContent = "✅ Đã copy!"; }
+  catch { $("copyLetter").textContent = "Copy tay giúp mình nhé (Ctrl+C)."; }
+  setTimeout(() => $("copyLetter").textContent = "📋 Copy dàn ý", 2000);
 };
-$('hunt').onclick = runPipeline;
-$('copy-letter').onclick = () => {
-  navigator.clipboard.writeText(state.letter).catch(() => {});
-};
-$('dl-json').onclick = () => {
-  const blob = new Blob([JSON.stringify({ profile: profileText(), results: state.ranked }, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'hocbong-hunter-results.json';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-};
-
-state.key = getKey();
-refreshKeyStatus();
