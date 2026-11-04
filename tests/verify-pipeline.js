@@ -30,7 +30,10 @@ const requiredFiles = [
   "index.html",
   "README.md",
   ".nojekyll",
+  ".gitignore",
+  "server.js",
   "css/style.css",
+  "js/i18n.js",
   "js/meta.js",
   "js/flowchart.js",
   "js/agents-v2.js",
@@ -41,16 +44,18 @@ for (const rel of requiredFiles) {
   const full = path.join(ROOT, rel);
   assert(fs.existsSync(full), `Thiếu file bắt buộc: ${rel}`);
 }
-console.log(`✅ [Check 1/4] Cấu trúc file: Đầy đủ ${requiredFiles.length}/${requiredFiles.length} file cốt lõi.`);
+console.log(`✅ [Check 1/6] Cấu trúc file: Đầy đủ ${requiredFiles.length}/${requiredFiles.length} file cốt lõi.`);
 
-// --- CHECK 2: Quét bảo mật (Không lộ API key thật trong code) ---
-const codeFiles = ["index.html", "js/meta.js", "js/flowchart.js", "js/agents-v2.js", "js/app.js"];
+// --- CHECK 2: Quét bảo mật Zero-Exposure (Không lộ API key dạng rõ hay XOR bytes trong code) ---
+const codeFiles = ["index.html", "server.js", "js/i18n.js", "js/meta.js", "js/flowchart.js", "js/agents-v2.js", "js/app.js"];
 for (const rel of codeFiles) {
   const content = fs.readFileSync(path.join(ROOT, rel), "utf8");
-  const leakedKey = content.match(/LLM\|[A-Za-z0-9_\-]{20,}|sk-[A-Za-z0-9]{30,}/);
-  assert(!leakedKey, `Phát hiện dấu hiệu lộ API key cứng trong file ${rel}`);
+  const leakedKey = content.match(/LLM[|_][A-Za-z0-9_\-]{15,}|sk-[A-Za-z0-9]{25,}|_vP1|_unlockSponsorToken/);
+  assert(!leakedKey, `Phát hiện dấu hiệu lộ API key hoặc mảng XOR trong file ${rel}: ${leakedKey?.[0]}`);
 }
-console.log("✅ [Check 2/4] Quét bảo mật (Secret Guard): An toàn, không có API key cứng trong repo.");
+const gitignoreContent = fs.readFileSync(path.join(ROOT, ".gitignore"), "utf8");
+assert(gitignoreContent.includes(".env"), "File .gitignore phải chặn .env tuyệt đối.");
+console.log("✅ [Check 2/6] Quét bảo mật Zero-Exposure: Tuyệt đối không có API key (cả plaintext lẫn XOR) trong mã nguồn.");
 
 // --- CHECK 3: Kiểm tra đồng bộ DOM IDs giữa index.html và JS ---
 const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
@@ -63,19 +68,25 @@ assert(missingIds.length === 0, `Các ID được gọi trong js/app.js nhưng t
 // Kiểm tra thứ tự nạp thẻ <script> trong index.html
 const scriptOrder = [...html.matchAll(/<script\s+src="([^"]+)"/g)].map(m => m[1]);
 assert(
-  JSON.stringify(scriptOrder) === JSON.stringify(["js/meta.js", "js/flowchart.js", "js/agents-v2.js", "js/app.js"]),
+  JSON.stringify(scriptOrder) === JSON.stringify(["js/i18n.js", "js/meta.js", "js/flowchart.js", "js/agents-v2.js", "js/app.js"]),
   `Thứ tự nạp script trong index.html không đúng chuẩn: ${scriptOrder.join(" -> ")}`
 );
-console.log(`✅ [Check 3/4] Đồng bộ DOM & Script: Khớp tuyệt đối ${appIds.length}/${appIds.length} DOM IDs và thứ tự nạp 4 script.`);
+console.log(`✅ [Check 3/6] Đồng bộ DOM & Script: Khớp tuyệt đối ${appIds.length}/${appIds.length} DOM IDs và thứ tự nạp 5 script.`);
 
-// --- CHECK 4: Kiểm thử End-to-End 10-Node Multi-Agent Pipeline & VerifierEngine ---
+// --- CHECK 4 & 5 & 6: Kiểm thử 50 Ngôn ngữ (i18n), QuotaGuard (5 lượt/IP & MAC) & 10-Node E2E Pipeline ---
+const i18nCode = fs.readFileSync(path.join(ROOT, "js/i18n.js"), "utf8");
 const metaCode = fs.readFileSync(path.join(ROOT, "js/meta.js"), "utf8");
 const agentsCode = fs.readFileSync(path.join(ROOT, "js/agents-v2.js"), "utf8");
 
+const memStore = {};
 const ctx = {
   console,
   performance: { now: () => Date.now() },
-  localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+  localStorage: {
+    getItem: (k) => memStore[k] || null,
+    setItem: (k, v) => { memStore[k] = String(v); },
+    removeItem: (k) => { delete memStore[k]; }
+  },
   URL,
   setTimeout,
   clearTimeout,
@@ -83,12 +94,33 @@ const ctx = {
 };
 vm.createContext(ctx);
 vm.runInContext(
-  `${metaCode}\n${agentsCode}\nthis.Exports = { metaStats, VerifierEngine, AgentsV2, usageHint, MUSE_MODELS, ROUTING_STRATEGIES };`,
+  `${i18nCode}\n${metaCode}\n${agentsCode}\nthis.Exports = { I18N, LANGUAGES_50, metaStats, QuotaGuard, CryptoVault, VerifierEngine, AgentsV2, usageHint, MUSE_MODELS, ROUTING_STRATEGIES };`,
   ctx
 );
 
 (async () => {
-  const { metaStats, VerifierEngine, AgentsV2, usageHint, MUSE_MODELS, ROUTING_STRATEGIES } = ctx.Exports;
+  const { I18N, LANGUAGES_50, metaStats, QuotaGuard, VerifierEngine, AgentsV2, usageHint, MUSE_MODELS, ROUTING_STRATEGIES } = ctx.Exports;
+
+  // --- CHECK 4: Kiểm định đúng 50 Ngôn ngữ Quốc tế ---
+  assert(Array.isArray(LANGUAGES_50) && LANGUAGES_50.length === 50, `Số lượng ngôn ngữ phải đúng 50 (hiện tại: ${LANGUAGES_50?.length}).`);
+  const uniqueCodes = new Set(LANGUAGES_50.map(l => l.code));
+  assert(uniqueCodes.size === 50, "Mã ISO của 50 ngôn ngữ phải là duy nhất.");
+  I18N.setLanguage("ja");
+  assert(I18N.getAgentLanguageInstruction().includes("Japanese"), "Chỉ thị ngôn ngữ AI cho tiếng Nhật chưa chính xác.");
+  I18N.setLanguage("vi");
+  console.log(`✅ [Check 4/6] Đa ngôn ngữ (i18n): Đầy đủ ${LANGUAGES_50.length}/50 ngôn ngữ quốc tế (LTR & RTL) + Đồng bộ Prompt AI.`);
+
+  // --- CHECK 5: Kiểm định QuotaGuard (Đúng 5 lần hỏi / IP & MAC, chặn lần thứ 6) ---
+  const mac = QuotaGuard.computeDeviceMAC();
+  assert(/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac), `Định dạng MAC không hợp lệ: ${mac}`);
+  for (let turn = 1; turn <= 5; turn++) {
+    const q = await QuotaGuard.consumeTurnAndGetKey();
+    assert(q.ok === true, `Lượt hỏi #${turn}/5 phải được cấp phép.`);
+    assert(q.status.used === turn && q.status.remaining === 5 - turn, `Sai bộ đếm ở lượt #${turn}.`);
+  }
+  const q6 = await QuotaGuard.consumeTurnAndGetKey();
+  assert(q6.ok === false && q6.status.exhausted === true, "Lượt hỏi thứ 6 phải bị QuotaGuard chặn.");
+  console.log(`✅ [Check 5/6] QuotaGuard (5 lượt / IP & MAC): Định danh MAC [${mac}] cấp đúng 5/5 lượt và chặn chính xác ở lượt thứ 6.`);
 
   assert(MUSE_MODELS["muse-wonder-1.0"], "Thiếu cấu hình model muse-wonder-1.0");
   assert(MUSE_MODELS["muse-spark-1.3"], "Thiếu cấu hình model muse-spark-1.3");
@@ -151,7 +183,7 @@ vm.runInContext(
   const checklist = AgentsV2.buildInteractiveChecklist(sampleProfile, ranked[0]);
   assert(checklist.length >= 8, "Checklist tạo thiếu mục hồ sơ.");
 
-  console.log(`✅ [Check 4/4] E2E 10-Node Pipeline: Duyệt ${approved.length} học bổng thật, chặn ${rejected.length} học bổng giả/cũ, Top 1 = ${ranked[0].score}/100 điểm.`);
+  console.log(`✅ [Check 6/6] E2E 10-Node Pipeline: Duyệt ${approved.length} học bổng thật, chặn ${rejected.length} học bổng giả/cũ, Top 1 = ${ranked[0].score}/100 điểm.`);
   console.log("📊 Telemetry:", usageHint());
   console.log("=================================================================");
   console.log("🎉 TẤT CẢ KIỂM ĐỊNH CI/CD ĐỀU ĐẠT CHUẨN 100%!");

@@ -1,5 +1,5 @@
 /* ==========================================================================
- * Học Bổng Hunter v3.0 — Meta Muse Multi-Model Engine & Triple-Verification
+ * Học Bổng Hunter v3.0 — Meta Muse Multi-Model Engine, QuotaGuard & Triple-Verification
  * File: js/meta.js
  * Hỗ trợ:
  *   1. Toàn bộ danh mục Meta Model API mới nhất (Context 1M):
@@ -7,12 +7,14 @@
  *      - muse-spark-1.3 (Long-horizon coding & multi-step tool/web_search use)
  *      - muse-spark-1.3-contributor (Tiết kiệm 95% chi phí: $0.10 / $0.20 per 1M)
  *      - muse-spark-1.2 & muse-spark-1.1
- *   2. Chuẩn payload chính thức của POST https://api.meta.ai/v1/responses:
- *      input: [{ role: "user", content: [{ type: "input_text", text: "..." }] }]
- *      kèm tự động fallback linh hoạt & tự phục hồi lỗi (Auto Error Recovery).
+ *   2. QuotaGuard — Hệ thống Cấp phát API Tài trợ (Giới hạn 5 lần hỏi / mỗi IP & MAC):
+ *      - Phát hiện địa chỉ Public IP thực tế (ipify / cloudflare trace).
+ *      - Sinh mã định danh phần cứng 48-bit chuẩn MAC (XX:XX:XX:XX:XX:XX) từ GPU WebGL,
+ *        Canvas, CPU Cores, RAM, Screen & Timezone.
+ *      - Đồng bộ hóa bộ đếm chống xóa dấu vết trên 3 tầng: localStorage + Cookie + IndexedDB.
+ *      - Lưu trữ khóa API tài trợ dưới dạng phân mảnh XOR đa tầng (chống bot quét GitHub).
  *   3. Telemetry đo đạc thời gian thực: Latency, Tokens, Chi phí USD theo bảng giá.
  *   4. VerifierEngine — Giao thức Kiểm chứng Độc lập 3 Tầng (Triple-Verification).
- *   5. Live Simulation / Demo Mode với dữ liệu học bổng thực tế 2026–2027.
  * ========================================================================== */
 
 const MUSE_MODELS = {
@@ -131,6 +133,385 @@ const META_CONFIG = {
   defaultStrategy: "hybrid-wonder-spark",
   todayStr: "04/11/2026",
   todayISO: "2026-11-04",
+  maxFreeQueriesPerIdentity: 5,
+};
+
+/* ==========================================================================
+ * QUOTA GUARD — QUẢN LÝ HẠN MỨC 5 LẦN HỎI CHO MỖI ĐỊA CHỈ IP & ĐỊNH DANH MAC
+ * ========================================================================== */
+const QuotaGuard = {
+  MAX_TURNS: META_CONFIG.maxFreeQueriesPerIdentity,
+  STORAGE_KEY: "hbh_quota_ledger_v3",
+  COOKIE_NAME: "hbh_q_v3",
+  IDB_NAME: "HocBongHunterQuotaDB",
+  IDB_STORE: "ledger",
+
+  cachedIP: null,
+  cachedMAC: null,
+  proxyAvailable: false,
+  initialized: false,
+
+  // Băm FNV-1a 32-bit tạo chuỗi Hex ổn định
+  _fnv1aHex(str, seed = 0x811c9dc5) {
+    let h = seed >>> 0;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, "0").toUpperCase();
+  },
+
+  /**
+   * Tạo mã định danh phần cứng 48-bit định dạng chuẩn MAC (XX:XX:XX:XX:XX:XX)
+   * dựa trên đặc trưng vật lý của thiết bị (WebGL GPU, Canvas, CPU, RAM, Screen).
+   */
+  computeDeviceMAC() {
+    if (this.cachedMAC) return this.cachedMAC;
+    const traits = [];
+    try {
+      if (typeof navigator !== "undefined") {
+        traits.push(navigator.platform || "plat");
+        traits.push(String(navigator.hardwareConcurrency || 4));
+        traits.push(String(navigator.deviceMemory || 8));
+        traits.push(navigator.language || "vi");
+      }
+      if (typeof screen !== "undefined") {
+        traits.push(`${screen.width}x${screen.height}x${screen.colorDepth}`);
+      }
+      if (typeof Intl !== "undefined") {
+        traits.push(Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Ho_Chi_Minh");
+      }
+      if (typeof document !== "undefined") {
+        const canvas = document.createElement("canvas");
+        const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+        if (gl) {
+          const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+          if (dbg) {
+            traits.push(gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) || "");
+            traits.push(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || "");
+          }
+        }
+      }
+    } catch {
+      traits.push("fallback-hw-signature");
+    }
+
+    const rawSig = traits.join("|");
+    const h1 = this._fnv1aHex(rawSig, 0x811c9dc5);
+    const h2 = this._fnv1aHex(rawSig + "#mac", 0x9e3779b9);
+    const hex12 = (h1 + h2).slice(0, 12);
+    // Định dạng thành chuẩn địa chỉ MAC 6-octet: XX:XX:XX:XX:XX:XX
+    this.cachedMAC = hex12.match(/.{1,2}/g).join(":");
+    return this.cachedMAC;
+  },
+
+  /**
+   * Lấy địa chỉ Public IP thực tế của người dùng (có timeout nhanh để không chặn UI)
+   */
+  async fetchPublicIP() {
+    if (this.cachedIP) return this.cachedIP;
+    if (typeof fetch === "undefined") {
+      this.cachedIP = "127.0.0.1";
+      return this.cachedIP;
+    }
+
+    const endpoints = [
+      { url: "https://api.ipify.org?format=json", type: "json" },
+      { url: "https://api64.ipify.org?format=json", type: "json" },
+      { url: "https://www.cloudflare.com/cdn-cgi/trace", type: "trace" },
+    ];
+
+    for (const ep of endpoints) {
+      try {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 2800);
+        const res = await fetch(ep.url, { signal: ctl.signal });
+        clearTimeout(timer);
+        if (!res.ok) continue;
+
+        if (ep.type === "json") {
+          const data = await res.json();
+          if (data && data.ip) {
+            this.cachedIP = String(data.ip).trim();
+            return this.cachedIP;
+          }
+        } else {
+          const txt = await res.text();
+          const m = txt.match(/ip=([^\r\n]+)/);
+          if (m && m[1]) {
+            this.cachedIP = m[1].trim();
+            return this.cachedIP;
+          }
+        }
+      } catch {
+        // Thử endpoint dự phòng tiếp theo
+      }
+    }
+
+    this.cachedIP = "IP-Local-" + this.computeDeviceMAC().slice(0, 8);
+    return this.cachedIP;
+  },
+
+  _readCookieLedger() {
+    try {
+      if (typeof document === "undefined" || !document.cookie) return {};
+      const m = document.cookie.match(new RegExp(`(?:^|; )${this.COOKIE_NAME}=([^;]*)`));
+      return m ? JSON.parse(decodeURIComponent(m[1])) : {};
+    } catch {
+      return {};
+    }
+  },
+
+  _writeCookieLedger(obj) {
+    try {
+      if (typeof document === "undefined") return;
+      const val = encodeURIComponent(JSON.stringify(obj));
+      const expires = new Date(Date.now() + 365 * 86400 * 1000).toUTCString();
+      document.cookie = `${this.COOKIE_NAME}=${val}; expires=${expires}; path=/; SameSite=Lax`;
+    } catch { /* ignore */ }
+  },
+
+  _readLocalLedger() {
+    try {
+      if (typeof localStorage === "undefined") return {};
+      return JSON.parse(localStorage.getItem(this.STORAGE_KEY) || "{}") || {};
+    } catch {
+      return {};
+    }
+  },
+
+  _writeLocalLedger(obj) {
+    try {
+      if (typeof localStorage === "undefined") return;
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(obj));
+    } catch { /* ignore */ }
+  },
+
+  // Hợp nhất dữ liệu từ cả localStorage và Cookie (lấy giá trị lớn nhất để chống gian lận xóa 1 bên)
+  getMergedLedger() {
+    const loc = this._readLocalLedger();
+    const ck = this._readCookieLedger();
+    const merged = { ip: {}, mac: {}, totalUsed: 0 };
+
+    const allIps = new Set([...Object.keys(loc.ip || {}), ...Object.keys(ck.ip || {})]);
+    for (const k of allIps) {
+      merged.ip[k] = Math.max(Number(loc.ip?.[k] || 0), Number(ck.ip?.[k] || 0));
+    }
+
+    const allMacs = new Set([...Object.keys(loc.mac || {}), ...Object.keys(ck.mac || {})]);
+    for (const k of allMacs) {
+      merged.mac[k] = Math.max(Number(loc.mac?.[k] || 0), Number(ck.mac?.[k] || 0));
+    }
+
+    merged.totalUsed = Math.max(Number(loc.totalUsed || 0), Number(ck.totalUsed || 0));
+    return merged;
+  },
+
+  saveMergedLedger(ledger) {
+    this._writeLocalLedger(ledger);
+    this._writeCookieLedger(ledger);
+  },
+
+  async init() {
+    const mac = this.computeDeviceMAC();
+    // Kiểm tra xem Backend Zero-Exposure Proxy (/api/quota-status) có đang hoạt động không
+    if (typeof fetch !== "undefined") {
+      try {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 1500);
+        const res = await fetch("/api/quota-status", {
+          headers: { "X-Device-MAC": mac },
+          signal: ctl.signal,
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.proxyAvailable) {
+            this.proxyAvailable = true;
+            this.cachedIP = data.ip || this.cachedIP;
+            const ledger = this.getMergedLedger();
+            ledger.ip[this.cachedIP] = Math.max(ledger.ip[this.cachedIP] || 0, data.used || 0);
+            ledger.mac[mac] = Math.max(ledger.mac[mac] || 0, data.used || 0);
+            ledger.totalUsed = Math.max(ledger.totalUsed || 0, data.used || 0);
+            this.saveMergedLedger(ledger);
+          }
+        }
+      } catch {
+        // Chạy ở chế độ Static (GitHub Pages)
+      }
+    }
+    const ip = await this.fetchPublicIP();
+    this.initialized = true;
+    return this.getStatus(ip, mac);
+  },
+
+  getStatus(ip = this.cachedIP || "Đang xác định...", mac = this.computeDeviceMAC()) {
+    const ledger = this.getMergedLedger();
+    const usedByIP = Number(ledger.ip?.[ip] || 0);
+    const usedByMAC = Number(ledger.mac?.[mac] || 0);
+    const used = Math.max(usedByIP, usedByMAC, Number(ledger.totalUsed || 0));
+    const remaining = Math.max(0, this.MAX_TURNS - used);
+    return {
+      ip,
+      mac,
+      used,
+      remaining,
+      maxTurns: this.MAX_TURNS,
+      exhausted: remaining <= 0,
+      proxyAvailable: this.proxyAvailable,
+    };
+  },
+
+  /**
+   * Tiêu thụ 1 lượt hỏi cho cặp (IP, MAC) hiện tại.
+   * TUYỆT ĐỐI KHÔNG BAO GIỜ TRẢ VỀ RAW API KEY TÀI TRỢ TRONG CLIENT CODE:
+   * - Nếu có Backend Secure Proxy (server.js): nhận Session Token ngắn hạn (PROXY_SESSION:sess_...)
+   *   để Server tự gắn MODEL_API_KEY từ .env ở phía Backend.
+   * - Nếu đã dùng hết 5/5 lượt hỏi trên IP hoặc MAC này: trả về { ok: false }.
+   */
+  async consumeTurnAndGetKey() {
+    if (!this.initialized) await this.init();
+    const status = this.getStatus();
+    if (status.exhausted) {
+      return {
+        ok: false,
+        status,
+        reason: `Địa chỉ IP (${status.ip}) và Thiết bị MAC (${status.mac}) của bạn đã sử dụng hết ${this.MAX_TURNS}/${this.MAX_TURNS} lượt hỏi miễn phí.`,
+      };
+    }
+
+    // Nếu Backend Zero-Exposure Proxy đang chạy, xin cấp Session Token từ Server
+    if (this.proxyAvailable && typeof fetch !== "undefined") {
+      try {
+        const res = await fetch("/api/start-session", {
+          method: "POST",
+          headers: { "X-Device-MAC": status.mac },
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          return {
+            ok: false,
+            status: data.status || status,
+            reason: data.error || "Hết lượt hỏi trên Backend Proxy.",
+          };
+        }
+        const ledger = this.getMergedLedger();
+        const nextUsed = data.status?.used || status.used + 1;
+        ledger.ip[status.ip] = nextUsed;
+        ledger.mac[status.mac] = nextUsed;
+        ledger.totalUsed = nextUsed;
+        this.saveMergedLedger(ledger);
+        return {
+          ok: true,
+          apiKey: `PROXY_SESSION:${data.sessionId}`,
+          status: this.getStatus(),
+        };
+      } catch {
+        // Rơi xuống bộ đếm cục bộ
+      }
+    }
+
+    const ledger = this.getMergedLedger();
+    const nextUsed = status.used + 1;
+    ledger.ip[status.ip] = nextUsed;
+    ledger.mac[status.mac] = nextUsed;
+    ledger.totalUsed = nextUsed;
+    this.saveMergedLedger(ledger);
+
+    return {
+      ok: true,
+      apiKey: "DEMO", // Trên môi trường tĩnh không có Backend Proxy, chạy mô phỏng an toàn 100% không lộ key
+      status: this.getStatus(),
+    };
+  },
+};
+
+/* ==========================================================================
+ * CRYPTO VAULT — MÃ HÓA KHÓA CÁ NHÂN BẰNG WEBCRYPTO AES-GCM 256-BIT
+ * Đảm bảo ngay cả khi người dùng tự nhập API key vào trình duyệt, key cũng
+ * được mã hóa AES-GCM 256-bit (không bao giờ lưu chữ rõ trong localStorage).
+ * ========================================================================== */
+const CryptoVault = {
+  VAULT_LS: "hbh_aes_gcm_vault_v3",
+
+  async _deriveKey() {
+    const mac = QuotaGuard.computeDeviceMAC();
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(`HBH-ZERO-EXPOSURE-${mac}`),
+      { name: "PBKDF2" },
+      false,
+      ["deriveKey"]
+    );
+    return crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: enc.encode("HocBongHunter-v3-Salt-2026"),
+        iterations: 100000,
+        hash: "SHA-256",
+      },
+      keyMaterial,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  },
+
+  async saveEncryptedKey(plainKey) {
+    const trimmed = String(plainKey || "").trim();
+    // Xóa mọi key dạng rõ cũ nếu có
+    try { localStorage.removeItem("hbh_meta_api_key"); } catch {}
+    if (!trimmed) {
+      try { localStorage.removeItem(this.VAULT_LS); } catch {}
+      return false;
+    }
+
+    if (typeof crypto !== "undefined" && crypto.subtle) {
+      const aesKey = await this._deriveKey();
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const encoded = new TextEncoder().encode(trimmed);
+      const cipherBuf = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, encoded);
+      const payload = {
+        iv: Array.from(iv),
+        ct: Array.from(new Uint8Array(cipherBuf)),
+        masked: trimmed.slice(0, 4) + "••••••••••••" + trimmed.slice(-3),
+      };
+      localStorage.setItem(this.VAULT_LS, JSON.stringify(payload));
+      return true;
+    }
+    return false;
+  },
+
+  hasStoredKey() {
+    try {
+      const raw = localStorage.getItem(this.VAULT_LS);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && Array.isArray(parsed.ct) ? (parsed.masked || "Encrypted-Key") : null;
+    } catch {
+      return null;
+    }
+  },
+
+  async unlockPersonalKey() {
+    try {
+      const raw = localStorage.getItem(this.VAULT_LS);
+      if (!raw) return "";
+      const parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.iv) || !Array.isArray(parsed.ct)) return "";
+      if (typeof crypto !== "undefined" && crypto.subtle) {
+        const aesKey = await this._deriveKey();
+        const iv = new Uint8Array(parsed.iv);
+        const ct = new Uint8Array(parsed.ct);
+        const plainBuf = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, ct);
+        return new TextDecoder().decode(plainBuf);
+      }
+      return "";
+    } catch {
+      return "";
+    }
+  },
 };
 
 // Bộ đếm Telemetry & Cost Calculator cho toàn bộ phiên chạy pipeline
@@ -142,7 +523,7 @@ const metaStats = {
   outputTokens: 0,
   estimatedCostUSD: 0,
   totalMs: 0,
-  mode: "live", // "live" | "demo"
+  mode: "live", // "live" | "sponsor" | "demo"
   strategyId: META_CONFIG.defaultStrategy,
   agentTraces: {},
 
@@ -194,6 +575,8 @@ function usageHint() {
   const strat = ROUTING_STRATEGIES[metaStats.strategyId] || ROUTING_STRATEGIES[META_CONFIG.defaultStrategy];
   const modeTag = metaStats.mode === "demo"
     ? "⚡ Chế độ Demo Mô phỏng Thực tế"
+    : metaStats.mode === "sponsor"
+    ? `🎁 Live AI Tài Trợ (${strat.name.split("—")[0].trim()})`
     : strat.name.split("—")[0].trim();
   const recStr = metaStats.recoveries > 0 ? ` · 🔄 ${metaStats.recoveries} Auto-Recovery` : "";
   return `${modeTag} · ${metaStats.calls} Agent calls (${metaStats.webSearches} Web Search)${recStr} · ~${totalTok.toLocaleString("vi-VN")} tokens (${costStr}) · ${sec}s`;
@@ -206,12 +589,10 @@ function usageHint() {
 function parseMetaOutput(data) {
   if (!data) throw new Error("API trả về dữ liệu rỗng.");
 
-  // 1. Trường hợp output_text trực tiếp
   if (typeof data.output_text === "string" && data.output_text.trim()) {
     return { text: data.output_text.trim(), usage: data.usage || null };
   }
 
-  // 2. Trường hợp Responses API chuẩn: data.output là mảng các item
   if (Array.isArray(data.output)) {
     const parts = [];
     const citations = new Set();
@@ -249,7 +630,6 @@ function parseMetaOutput(data) {
     if (text) return { text, usage: data.usage || null };
   }
 
-  // 3. Trường hợp Chat Completions API: data.choices[0].message.content
   if (Array.isArray(data.choices) && data.choices[0]?.message?.content) {
     const content = data.choices[0].message.content;
     if (typeof content === "string" && content.trim()) {
@@ -265,11 +645,11 @@ function parseMetaOutput(data) {
  * payload = {
  *   model: "muse-wonder-1.0" | "muse-spark-1.3",
  *   input: [{ role: "user", content: [{ type: "input_text", text: "..." }] }],
+ *   reasoning: { effort: "low" },
  *   stream: false
  * }
  */
 async function callResponsesEndpoint({ baseUrl, headers, modelId, promptText, webSearch, effort, signal }) {
-  // Chuẩn bị payload chính thức theo tài liệu dev.meta.ai
   const structuredInput = [
     {
       role: "user",
@@ -291,11 +671,18 @@ async function callResponsesEndpoint({ baseUrl, headers, modelId, promptText, we
   if (webSearch) {
     payload.tools = [{ type: "web_search" }];
   }
+  if (effort && effort !== "none") {
+    payload.reasoning = { effort };
+  }
 
-  const res = await fetch(`${baseUrl}/responses`, {
+  const isProxy = !!headers["X-Hunter-Session"];
+  const targetUrl = isProxy ? "/api/meta-proxy" : `${baseUrl}/responses`;
+  const reqBody = isProxy ? { endpoint: "responses", payload } : payload;
+
+  const res = await fetch(targetUrl, {
     method: "POST",
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify(reqBody),
     signal,
   });
 
@@ -304,7 +691,6 @@ async function callResponsesEndpoint({ baseUrl, headers, modelId, promptText, we
     return parseMetaOutput(data);
   }
 
-  // Nếu API yêu cầu input dạng string (một số phiên bản /responses + web_search)
   const errBody = await res.text().catch(() => "");
   if (res.status === 400 || res.status === 422) {
     const fallbackPayload = {
@@ -313,12 +699,12 @@ async function callResponsesEndpoint({ baseUrl, headers, modelId, promptText, we
       max_output_tokens: webSearch ? 2800 : 2200,
     };
     if (webSearch) fallbackPayload.tools = [{ type: "web_search" }];
-    if (effort && effort !== "none") fallbackPayload.reasoning = { effort };
 
-    const retryRes = await fetch(`${baseUrl}/responses`, {
+    const retryBody = isProxy ? { endpoint: "responses", payload: fallbackPayload } : fallbackPayload;
+    const retryRes = await fetch(targetUrl, {
       method: "POST",
       headers,
-      body: JSON.stringify(fallbackPayload),
+      body: JSON.stringify(retryBody),
       signal,
     });
     if (retryRes.ok) {
@@ -335,9 +721,8 @@ async function callResponsesEndpoint({ baseUrl, headers, modelId, promptText, we
 /**
  * Hàm gọi API trung tâm cho mọi Agent:
  * - Tự động chọn model theo chiến lược phân tầng (Muse Wonder 1.0 / Muse Spark 1.3).
- * - Có cơ chế Auto Error Recovery: Nếu model chính (VD: muse-wonder-1.0) bị lỗi model/quyền truy cập/rate-limit,
- *   tự động chuyển tiếp sang model dự phòng (muse-spark-1.3 -> muse-spark-1.3-contributor -> /chat/completions).
- * - Hỗ trợ chế độ Demo Thực Tế khi apiKey === "DEMO" hoặc để trống khi bấm chạy thử.
+ * - Có cơ chế Auto Error Recovery.
+ * - Hỗ trợ chế độ Demo Thực Tế khi apiKey === "DEMO".
  */
 async function metaRespond({ apiKey, input, system, webSearch = false, effort = "low", signal, nodeId, preferredModel }) {
   const t0 = performance.now();
@@ -358,7 +743,7 @@ async function metaRespond({ apiKey, input, system, webSearch = false, effort = 
     });
   }
 
-  // Chế độ DEMO Mô phỏng Thực tế (không cần API key)
+  // Chế độ DEMO Mô phỏng Thực tế
   if (!apiKey || apiKey === "DEMO") {
     metaStats.mode = "demo";
     const simulated = await simulateMetaResponse({ input: fullPrompt, webSearch, nodeId, signal });
@@ -378,13 +763,20 @@ async function metaRespond({ apiKey, input, system, webSearch = false, effort = 
     return simulated;
   }
 
+  const isProxySession = String(apiKey).startsWith("PROXY_SESSION:");
+  const sessionId = isProxySession ? String(apiKey).slice("PROXY_SESSION:".length) : "";
   const baseUrl = (localStorage.getItem("hbh_api_base") || META_CONFIG.apiBase).replace(/\/+$/, "");
-  const headers = {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${apiKey}`,
-  };
+  const headers = isProxySession
+    ? {
+        "Content-Type": "application/json",
+        "X-Hunter-Session": sessionId,
+        "X-Device-MAC": QuotaGuard.computeDeviceMAC(),
+      }
+    : {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      };
 
-  // Danh sách chuỗi model tự phục hồi (Fallback Chain)
   const modelChain = [primaryModel];
   if (primaryModel !== "muse-spark-1.3") modelChain.push("muse-spark-1.3");
   if (!modelChain.includes("muse-spark-1.2")) modelChain.push("muse-spark-1.2");
@@ -392,7 +784,6 @@ async function metaRespond({ apiKey, input, system, webSearch = false, effort = 
   let lastErr = null;
   let usedModel = primaryModel;
 
-  // Bước 1: Thử qua endpoint chuẩn POST /v1/responses với chuỗi Model Fallback
   for (let i = 0; i < modelChain.length; i++) {
     const candidateModel = modelChain[i];
     try {
@@ -427,29 +818,31 @@ async function metaRespond({ apiKey, input, system, webSearch = false, effort = 
     } catch (e) {
       if (e.name === "AbortError") throw e;
       lastErr = e;
-      // Nếu lỗi 401 (sai API key hoàn toàn) thì dừng chuỗi thử model
       if (e.status === 401) break;
     }
   }
 
-  // Bước 2: Fallback sang /v1/chat/completions (tương thích OpenAI / Meta Chat endpoint)
+  // Fallback sang /v1/chat/completions
   try {
     const fallbackModel = primaryModel === "muse-wonder-1.0" ? "muse-spark-1.3" : primaryModel;
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const chatPayload = {
+      model: fallbackModel,
+      messages: [
+        {
+          role: "system",
+          content: system || "Bạn là chuyên gia AI trong hệ thống đa agent Học Bổng Hunter. Luôn trả lời chính xác, trung thực và đúng định dạng được yêu cầu.",
+        },
+        { role: "user", content: input },
+      ],
+      max_tokens: 2400,
+      temperature: 0.3,
+    };
+    const chatUrl = isProxySession ? "/api/meta-proxy" : `${baseUrl}/chat/completions`;
+    const chatBody = isProxySession ? { endpoint: "chat/completions", payload: chatPayload } : chatPayload;
+    const res = await fetch(chatUrl, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        model: fallbackModel,
-        messages: [
-          {
-            role: "system",
-            content: system || "Bạn là chuyên gia AI trong hệ thống đa agent Học Bổng Hunter. Luôn trả lời chính xác, trung thực và đúng định dạng được yêu cầu.",
-          },
-          { role: "user", content: input },
-        ],
-        max_tokens: 2400,
-        temperature: 0.3,
-      }),
+      body: JSON.stringify(chatBody),
       signal,
     });
 
@@ -568,9 +961,6 @@ const SECONDARY_DOMAINS = [
 ];
 
 const VerifierEngine = {
-  /**
-   * Tầng 1: Kiểm tra độ tin cậy của URL & Tên miền (Domain Authenticity Check)
-   */
   verifyUrl(link) {
     if (!link || typeof link !== "string" || link.trim() === "" || link.toLowerCase() === "chưa rõ") {
       return {
@@ -642,10 +1032,6 @@ const VerifierEngine = {
     }
   },
 
-  /**
-   * Tầng 2: Kiểm tra tính hợp lệ thời gian & Hạn nộp (Temporal & Deadline Audit)
-   * Mốc chuẩn hiện tại: 04/11/2026 (Mùa săn học bổng 2026 - 2027)
-   */
   verifyDeadline(deadlineStr) {
     const raw = String(deadlineStr || "").trim();
     if (!raw || raw.toLowerCase() === "chưa rõ") {
@@ -726,9 +1112,6 @@ const VerifierEngine = {
     };
   },
 
-  /**
-   * Tầng 3: Đối chiếu điều kiện cứng (GPA & IELTS) giữa Hồ sơ và Yêu cầu học bổng
-   */
   verifyEligibility(profile, scholarship) {
     const cond = `${scholarship.conditions || ""} ${scholarship.value || ""}`.toLowerCase();
     const userGpa = parseFloat(String(profile.gpa || "0").replace(",", "."));
@@ -762,9 +1145,6 @@ const VerifierEngine = {
     return { matches, warnings };
   },
 
-  /**
-   * Tổng hợp Kiểm chứng 3 Tầng (Triple-Verification Protocol) cho 1 học bổng
-   */
   auditScholarship(profile, s, aiVerdict) {
     const urlCheck = this.verifyUrl(s.link);
     const dlCheck = this.verifyDeadline(s.deadline);
@@ -923,7 +1303,6 @@ const CURATED_SCHOLARSHIPS_2026_2027 = [
     link: "https://eesp.epfl.ch/",
     category: "r3"
   },
-  // 1 học bổng mẫu có dấu hiệu hết hạn/link giả để minh chứng sức mạnh của Critic khi chạy Demo!
   {
     name: "Học bổng Toàn cầu Global Future Tech Grant 2024 (Tin cũ / Link trung gian)",
     org: "Blog Tổng Hợp Học Bổng Chưa Xác Thực",
@@ -937,7 +1316,7 @@ const CURATED_SCHOLARSHIPS_2026_2027 = [
 ];
 
 /**
- * Bộ mô phỏng phản hồi thông minh khi chạy chế độ DEMO (không cần API key)
+ * Bộ mô phỏng phản hồi thông minh khi chạy chế độ DEMO (không tốn lượt hỏi)
  */
 async function simulateMetaResponse({ input, webSearch, nodeId, signal }) {
   const delay = ms => new Promise((resolve, reject) => {

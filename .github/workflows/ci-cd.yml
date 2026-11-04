@@ -34,10 +34,12 @@ jobs:
 
       - name: 🔍 Check 1 — Validate JavaScript Syntax (All Modules)
         run: |
+          node --check js/i18n.js
           node --check js/meta.js
           node --check js/flowchart.js
           node --check js/agents-v2.js
           node --check js/app.js
+          node --check server.js
           node --check tests/verify-pipeline.js
           echo "✅ All JavaScript modules passed syntax check!"
 

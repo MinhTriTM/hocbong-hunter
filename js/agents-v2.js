@@ -23,6 +23,10 @@
  *  [10] Strategic Application Drafter (Muse Wonder 1.0 ── Motivation Letter + Action Plan + Interview)
  * ========================================================================== */
 
+function langHint() {
+  return typeof I18N !== "undefined" ? I18N.getAgentLanguageInstruction() : "Ngôn ngữ: Tiếng Việt.";
+}
+
 function profileText(p) {
   return [
     `Bậc học mục tiêu: ${p.level}`,
@@ -124,7 +128,8 @@ ${String(rawCvText || "").slice(0, 6000)}`;
   // ── 1) SUPERVISOR: Chia 3 hướng tìm kiếm chuyên biệt theo hồ sơ (Muse Wonder 1.0) ──
   async supervise(apiKey, p, signal) {
     const input =
-`Bạn là Supervisor Agent (chạy trên Meta Muse Wonder) của hệ đa agent săn học bổng cho sinh viên Việt Nam.
+`Bạn là Supervisor Agent (chạy trên Meta Muse Wonder) của hệ đa agent săn học bổng quốc tế.
+${langHint()}
 Hồ sơ ứng viên: ${profileText(p)}
 
 Nhiệm vụ:
@@ -165,6 +170,7 @@ Trả về ĐÚNG JSON object, không thêm chữ nào ngoài JSON:
   async researchLane(apiKey, p, lane, signal) {
     const input =
 `Bạn là Researcher Agent chuyên trách hướng "${lane.title}" trong hệ đa agent săn học bổng.
+${langHint()}
 Hướng tìm kiếm: ${lane.focus}
 Gợi ý truy vấn: ${(lane.queries || []).join(" | ")}
 
@@ -259,6 +265,7 @@ ${mergedText}`;
   async critic(apiKey, p, scholarships, signal) {
     const input =
 `Bạn là Critic Agent — Kiểm định viên ĐỘC LẬP (Fresh Context) chạy trên Meta Muse.
+${langHint()}
 Hôm nay là ngày ${META_CONFIG.todayStr} (Mùa săn học bổng niên khóa 2026–2027).
 
 Danh sách học bổng cần kiểm định (JSON):
@@ -317,6 +324,7 @@ Trả về ĐÚNG JSON object, không thêm chữ ngoài JSON:
   async rank(apiKey, p, scholarships, signal) {
     const input =
 `Hồ sơ ứng viên: ${profileText(p)}
+${langHint()}
 
 Danh sách học bổng ĐÃ QUA KIỂM ĐỊNH (JSON):
 ${JSON.stringify(scholarships.map(({ verification, isRejected, rejectReason, ...core }) => core))}
@@ -393,6 +401,7 @@ Trả về ĐÚNG JSON array, sắp xếp giảm dần theo score, không thêm 
   async draftLetter(apiKey, p, target, signal) {
     const input =
 `Bạn là Cố vấn Học bổng Quốc tế Cấp cao (chạy trên Meta Muse Wonder 1.0).
+${langHint()}
 Hồ sơ ứng viên: ${profileText(p)}
 Học bổng mục tiêu: ${target.name} — ${target.org} (${target.country})
 Giá trị: ${target.value} | Hạn nộp: ${target.deadline} | Điều kiện: ${target.conditions}

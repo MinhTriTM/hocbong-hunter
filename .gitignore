@@ -1,0 +1,10 @@
+# Tuyệt đối không bao giờ commit file môi trường hoặc khóa bí mật lên Git
+.env
+.env.*
+*.key
+*.pem
+*.secret
+node_modules/
+_site/
+.DS_Store
+Thumbs.db

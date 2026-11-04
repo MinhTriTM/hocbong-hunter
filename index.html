@@ -11,32 +11,36 @@
   <div class="hero-badges">
     <span class="pill-badge wonder">✨ Meta Muse Wonder 1.0 · 1M Context</span>
     <span class="pill-badge spark">⚡ Muse Spark 1.3 · Web Search Grounding</span>
-    <span class="pill-badge verify">🛡️ Triple-Verification Protocol</span>
+    <span class="pill-badge verify">🛡️ Zero-Exposure API · Triple-Verified</span>
+    <div class="lang-switcher">
+      <label for="langSelect" class="sr-only">Language</label>
+      <select id="langSelect" title="Chọn ngôn ngữ (50 Languages Supported)"></select>
+    </div>
   </div>
-  <h1>🎯 Học Bổng Hunter <span class="v2badge">v3.0 · Multi-Agent</span></h1>
-  <p class="subtitle">
+  <h1><span data-i18n="appTitle">🎯 Học Bổng Hunter</span> <span class="v2badge">v3.0 · 50 Languages</span></h1>
+  <p class="subtitle" data-i18n="subtitle">
     Hệ thống Đa Agent săn học bổng thực tế cho sinh viên Việt Nam:
-    <b>Profile Analyzer</b> → <b>Supervisor (Muse Wonder 1.0)</b> → <b>3 Researchers song song (Muse Spark 1.3 + Web Search)</b> →
-    <b>Deduplicator</b> → <b>Extractor</b> → <b>Triple-Verify Critic</b> → <b>Multi-Matcher</b> → <b>Strategic Drafter</b>.
+    Profile Analyzer → Supervisor (Muse Wonder 1.0) → 3 Researchers song song (Muse Spark 1.3 + Web Search) →
+    Deduplicator → Extractor → Triple-Verify Critic → Multi-Matcher → Strategic Drafter.
   </p>
 
   <!-- Thanh chỉ số nhanh -->
   <div class="kpi-strip" id="kpiStrip">
     <div class="kpi-item">
       <span class="kpi-val" id="kpiAgents">10 Nodes</span>
-      <span class="kpi-lbl">Kiến trúc Đa Agent</span>
+      <span class="kpi-lbl" data-i18n="kpiArch">Kiến trúc Đa Agent</span>
     </div>
     <div class="kpi-item">
       <span class="kpi-val" id="kpiFound">0</span>
-      <span class="kpi-lbl">Học bổng phát hiện</span>
+      <span class="kpi-lbl" data-i18n="kpiFound">Học bổng phát hiện</span>
     </div>
     <div class="kpi-item">
       <span class="kpi-val" id="kpiVerified">0</span>
-      <span class="kpi-lbl">Đạt Kiểm chứng 3 Tầng</span>
+      <span class="kpi-lbl" data-i18n="kpiVerified">Đạt Kiểm chứng 3 Tầng</span>
     </div>
     <div class="kpi-item">
       <span class="kpi-val" id="kpiCost">$0.0000</span>
-      <span class="kpi-lbl">Chi phí API ước tính</span>
+      <span class="kpi-lbl" data-i18n="kpiCost">Chi phí API ước tính</span>
     </div>
   </div>
 </header>
@@ -45,24 +49,39 @@
   <!-- 1. Cấu hình Meta Model API & Điều phối Đa Model -->
   <section class="card" id="key-card">
     <div class="card-head-row">
-      <h2>🔑 Meta Model API & Điều phối Đa Model (Muse Hub)</h2>
-      <span class="status-chip" id="keyBadge">⚡ Sẵn sàng (Live / Demo)</span>
+      <h2 data-i18n="secCardTitle">🔒 Bảo mật Zero-Exposure &amp; Điều phối Đa Model (Muse Hub)</h2>
+      <span class="status-chip" id="keyBadge">🛡️ Zero-Exposure Active</span>
     </div>
+
+    <!-- Hộp hiển thị Hạn mức 5 lượt hỏi theo IP & MAC (QuotaGuard) -->
+    <div class="quota-banner" id="quotaBanner">
+      <div class="quota-info">
+        <strong data-i18n="quotaTitle">🛡️ Chế độ Bảo vệ Khóa Tuyệt Đối (Zero-Key Exposure + QuotaGuard 5 Lượt/IP &amp; MAC):</strong>
+        <span id="quotaTurnsText" class="quota-pill">Còn 5/5 lượt hỏi miễn phí</span>
+      </div>
+      <div class="quota-id-row">
+        <span>🌐 IP: <code id="quotaIpText">Đang xác định...</code></span>
+        <span>🖥️ Định danh MAC / Thiết bị: <code id="quotaMacText">Đang tính toán...</code></span>
+        <span>🔐 Vault: <code>AES-GCM 256-bit + Backend Proxy</code></span>
+      </div>
+      <div class="quota-bar-track">
+        <div class="quota-bar-fill" id="quotaBarFill" style="width:100%"></div>
+      </div>
+    </div>
+
     <p class="hint">
-      Lấy API key tại <a href="https://dev.meta.ai" target="_blank" rel="noopener">dev.meta.ai</a> ($20 free credit hoặc $150 Hackathon credit).
-      Key <b>chỉ lưu cục bộ trong localStorage trình duyệt</b>, gọi trực tiếp tới <code>https://api.meta.ai/v1/responses</code>.
-      Nếu chưa có key, bạn có thể bấm <b>⚡ Chạy Demo Thực Tế</b> ngay bên dưới!
+      <b>Bảo mật tuyệt đối (Zero-Exposure):</b> Không có bất kỳ API key nào nằm trong mã nguồn Client. Khi chạy qua <code>server.js</code> (Backend Proxy), khóa nằm 100% trong <code>.env</code> phía Server và tự động giới hạn <b>5 lần hỏi / mỗi IP &amp; MAC</b>. Khi bạn nhập key cá nhân, key được mã hóa chuẩn quân sự <b>WebCrypto AES-GCM 256-bit</b> gắn với phần cứng máy.
     </p>
 
     <div class="grid-2col">
-      <label>Meta Model API Key (MODEL_API_KEY)
+      <label><span data-i18n="apiKeyLabel">Meta Model API Key (Mã hóa AES-GCM 256-bit cục bộ)</span>
         <div class="row">
-          <input type="password" id="apiKey" placeholder="Dán Meta Model API key (hoặc để trống để chạy Demo)..." autocomplete="off">
-          <button id="saveKey" type="button">💾 Lưu key</button>
+          <input type="password" id="apiKey" data-i18n-placeholder="apiKeyPlaceholder" placeholder="Dán API key (được mã hóa AES-GCM, không bao giờ lộ plaintext)..." autocomplete="off">
+          <button id="saveKey" type="button" data-i18n="saveKeyBtn">🔒 Mã hóa &amp; Lưu</button>
         </div>
       </label>
 
-      <label>Chiến lược Điều phối Đa Model (Multi-Model Routing)
+      <label><span data-i18n="strategyLabel">Chiến lược Điều phối Đa Model (Multi-Model Routing)</span>
         <select id="modelStrategy">
           <option value="hybrid-wonder-spark">🔥 Hybrid Frontier: Muse Wonder 1.0 (Planner/Critic) + Spark 1.3 (Search)</option>
           <option value="all-spark-1.3">⚡ Toàn bộ Muse Spark 1.3 ($1.25 in / $4.25 out per 1M)</option>
@@ -127,9 +146,9 @@
   <!-- 2. Hồ sơ ứng viên + Presets + AI CV Parser -->
   <section class="card">
     <div class="card-head-row">
-      <h2>👤 Hồ sơ Học thuật của Bạn</h2>
+      <h2 data-i18n="profileCardTitle">👤 Hồ sơ Học thuật của Bạn</h2>
       <div class="preset-bar">
-        <span class="hint">Hồ sơ mẫu 1-Click:</span>
+        <span class="hint" data-i18n="presetHint">Hồ sơ mẫu 1-Click:</span>
         <button type="button" class="chip-btn" data-preset="it-master">💻 CNTT / AI (GPA 3.6)</button>
         <button type="button" class="chip-btn" data-preset="biz-gov">📈 Kinh tế (GPA 3.4)</button>
         <button type="button" class="chip-btn" data-preset="stem-phd">🔬 Nghiên cứu STEM (GPA 3.8)</button>
@@ -151,7 +170,7 @@
     </details>
 
     <div class="grid">
-      <label>Bậc học mục tiêu
+      <label><span data-i18n="lblLevel">Bậc học mục tiêu</span>
         <select id="level">
           <option>Đại học</option>
           <option>Cao học (Thạc sĩ)</option>
@@ -159,11 +178,11 @@
           <option>THPT</option>
         </select>
       </label>
-      <label>Ngành học <input id="major" value="Công nghệ thông tin & Trí tuệ nhân tạo" placeholder="VD: Công nghệ thông tin"></label>
-      <label>GPA (thang 4.0) <input id="gpa" value="3.45" inputmode="decimal" placeholder="VD: 3.45"></label>
-      <label>Năm học / Hiện trạng <input id="year" value="Năm 3" placeholder="VD: Năm 3, Năm cuối, Đã tốt nghiệp"></label>
-      <label>Chứng chỉ Ngoại ngữ <input id="english" value="IELTS 6.5" placeholder="VD: IELTS 6.5, JLPT N2, TOPIK 4"></label>
-      <label>Loại học bổng mong muốn
+      <label><span data-i18n="lblMajor">Ngành học</span> <input id="major" value="Công nghệ thông tin & Trí tuệ nhân tạo" placeholder="VD: Công nghệ thông tin"></label>
+      <label><span data-i18n="lblGpa">GPA (thang 4.0)</span> <input id="gpa" value="3.45" inputmode="decimal" placeholder="VD: 3.45"></label>
+      <label><span data-i18n="lblYear">Năm học / Hiện trạng</span> <input id="year" value="Năm 3" placeholder="VD: Năm 3, Năm cuối, Đã tốt nghiệp"></label>
+      <label><span data-i18n="lblEnglish">Chứng chỉ Ngoại ngữ</span> <input id="english" value="IELTS 6.5" placeholder="VD: IELTS 6.5, JLPT N2, TOPIK 4"></label>
+      <label><span data-i18n="lblKind">Loại học bổng mong muốn</span>
         <select id="kind">
           <option>Du học toàn phần</option>
           <option>Du học bán phần</option>
@@ -171,23 +190,23 @@
           <option>Ngắn hạn / trao đổi</option>
         </select>
       </label>
-      <label>Quốc gia / Khu vực ưu tiên <input id="countries" value="Nhật, Hàn, Úc, châu Âu" placeholder="VD: Nhật, Hàn, Úc, Mỹ"></label>
-      <label>Thành tích / Hoàn cảnh đặc biệt <input id="note" value="Giải Nhì NCKH Sinh viên, 1 bài báo khoa học" placeholder="VD: Giải NCKH, Hackathon, hộ nghèo..."></label>
+      <label><span data-i18n="lblCountries">Quốc gia / Khu vực ưu tiên</span> <input id="countries" value="Nhật, Hàn, Úc, châu Âu" placeholder="VD: Nhật, Hàn, Úc, Mỹ"></label>
+      <label><span data-i18n="lblNote">Thành tích / Hoàn cảnh đặc biệt</span> <input id="note" value="Giải Nhì NCKH Sinh viên, 1 bài báo khoa học" placeholder="VD: Giải NCKH, Hackathon, hộ nghèo..."></label>
     </div>
 
     <!-- Đánh giá nhanh hồ sơ từ Profile Analyzer -->
     <div id="profileInsights" class="profile-insights"></div>
 
     <div class="action-buttons-row">
-      <button id="hunt" class="primary" type="button">🚀 Săn Học Bổng Ngay (Multi-Agent Pipeline)</button>
-      <button id="huntDemo" class="secondary-cta" type="button" title="Chạy mô phỏng toàn bộ 10-Node Agent với dữ liệu học bổng 2026-2027 thực tế mà không tốn API credit">⚡ Chạy Demo Thực Tế (0 Credit)</button>
+      <button id="hunt" class="primary" type="button" data-i18n="huntBtn">🚀 Săn Học Bổng Ngay (Multi-Agent Pipeline)</button>
+      <button id="huntDemo" class="secondary-cta" type="button" data-i18n="demoBtn" title="Chạy mô phỏng toàn bộ 10-Node Agent với dữ liệu học bổng 2026-2027 thực tế mà không tốn API credit">⚡ Chạy Demo Thực Tế (0 Credit)</button>
     </div>
   </section>
 
   <!-- 3. Pipeline: Flowchart Live + Agent Inspector -->
   <section class="card hidden" id="pipeline-card">
     <div class="card-head-row">
-      <h2>⚙️ Trung tâm Điều hành Đa Agent <span class="hint">— Bấm vào từng Node để soi Input/Output & Latency</span></h2>
+      <h2><span data-i18n="pipelineTitle">⚙️ Trung tâm Điều hành Đa Agent</span> <span class="hint">— Bấm vào từng Node để soi Input/Output &amp; Latency</span></h2>
       <span class="badge-pill brand" id="activeStrategyBadge">Hybrid Frontier</span>
     </div>
     <svg id="flowsvg" role="img" aria-label="Flowchart pipeline 10 nodes"></svg>
@@ -202,7 +221,7 @@
   <!-- 4. Kết quả Học bổng + Bộ lọc + So sánh + Xuất báo cáo -->
   <section class="card hidden" id="results-card">
     <div class="card-head-row">
-      <h2>🏆 Học Bổng Đã Qua Kiểm Chứng <span class="hint" id="resultsSummaryCount"></span></h2>
+      <h2><span data-i18n="resultsTitle">🏆 Học Bổng Đã Qua Kiểm Chứng</span> <span class="hint" id="resultsSummaryCount"></span></h2>
       <div class="export-bar">
         <button type="button" class="sm-btn" id="openCompareBtn">⚖️ So sánh (<span id="compareCount">0</span>)</button>
         <button type="button" class="sm-btn" id="exportJson">⬇️ JSON</button>
@@ -213,7 +232,7 @@
 
     <!-- Thanh công cụ Lọc & Sắp xếp -->
     <div class="filter-bar">
-      <input type="search" id="searchFilter" placeholder="🔍 Tìm theo tên học bổng, quốc gia, tổ chức...">
+      <input type="search" id="searchFilter" data-i18n-placeholder="searchPlaceholder" placeholder="🔍 Tìm theo tên học bổng, quốc gia, tổ chức...">
       <select id="tierFilter">
         <option value="all">🛡️ Tất cả nguồn đã duyệt</option>
         <option value="official">🏛️ Chỉ Cổng Chính Thức (.gov/.edu/.org)</option>
@@ -273,6 +292,7 @@
   </p>
 </footer>
 
+<script src="js/i18n.js"></script>
 <script src="js/meta.js"></script>
 <script src="js/flowchart.js"></script>
 <script src="js/agents-v2.js"></script>

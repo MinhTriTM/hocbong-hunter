@@ -21,6 +21,7 @@ const appState = {
   checklistState: JSON.parse(localStorage.getItem(CHK_LS) || "{}"),
   currentTargetIdx: 0,
   letterCache: {},
+  activeSessionKey: null,
 };
 
 // 4 Bộ Hồ sơ mẫu 1-Click
@@ -140,19 +141,43 @@ function fail(msg) {
   if ($("huntDemo")) $("huntDemo").disabled = false;
 }
 
-// --- Khởi tạo API Key & Chiến lược Model ---
+// --- Khởi tạo API Key, QuotaGuard (5 lượt / IP & MAC) & Chiến lược Model ---
+function refreshQuotaUI() {
+  if (typeof QuotaGuard === "undefined") return;
+  const st = QuotaGuard.getStatus();
+  if ($("quotaIpText")) $("quotaIpText").textContent = st.ip;
+  if ($("quotaMacText")) $("quotaMacText").textContent = st.mac;
+  if ($("quotaTurnsText")) {
+    $("quotaTurnsText").textContent = st.exhausted
+      ? `Hết lượt miễn phí (Đã dùng ${st.used}/${st.maxTurns})`
+      : `Còn ${st.remaining}/${st.maxTurns} lượt hỏi Live AI`;
+    $("quotaTurnsText").classList.toggle("exhausted", st.exhausted);
+  }
+  if ($("quotaBarFill")) {
+    const pct = Math.max(0, Math.min(100, Math.round((st.remaining / st.maxTurns) * 100)));
+    $("quotaBarFill").style.width = `${pct}%`;
+  }
+}
+
 function refreshKeyStatus() {
-  const k = (localStorage.getItem(KEY_LS) || "").trim();
+  const maskedKey = typeof CryptoVault !== "undefined" ? CryptoVault.hasStoredKey() : null;
   const strat = localStorage.getItem(STRAT_LS) || META_CONFIG.defaultStrategy;
   if ($("modelStrategy")) $("modelStrategy").value = strat;
 
-  if (k) {
-    $("apiKey").value = k;
-    $("keyStatus").textContent = "✅ Đã lưu Meta Model API key trong trình duyệt. Sẵn sàng gọi trực tiếp api.meta.ai/v1/responses.";
-    if ($("keyBadge")) $("keyBadge").textContent = "🟢 Đã cấu hình Live API Key";
+  refreshQuotaUI();
+  const qSt = typeof QuotaGuard !== "undefined" ? QuotaGuard.getStatus() : { remaining: 5, maxTurns: 5, exhausted: false };
+
+  if (maskedKey) {
+    $("apiKey").value = "";
+    $("apiKey").placeholder = `🔐 Đã mã hóa AES-GCM 256-bit (${maskedKey})`;
+    $("keyStatus").textContent = `✅ Đã lưu khóa API cá nhân dưới dạng mã hóa chuẩn quân sự AES-GCM 256-bit (${maskedKey}) — Không bao giờ lưu chữ rõ!`;
+    if ($("keyBadge")) $("keyBadge").textContent = "🔐 AES-GCM Vault Active";
+  } else if (!qSt.exhausted) {
+    $("keyStatus").textContent = `🛡️ Zero-Exposure Active: Bạn còn ${qSt.remaining}/${qSt.maxTurns} lượt hỏi cho IP (${qSt.ip}) & Thiết bị MAC (${qSt.mac}).`;
+    if ($("keyBadge")) $("keyBadge").textContent = `🛡️ Còn ${qSt.remaining}/${qSt.maxTurns} lượt`;
   } else {
-    $("keyStatus").textContent = "💡 Chưa nhập API key — Bạn có thể dán key ở trên hoặc bấm Săn Học Bổng / Chạy Demo để trải nghiệm ngay.";
-    if ($("keyBadge")) $("keyBadge").textContent = "⚡ Chế độ Demo / Live Sẵn sàng";
+    $("keyStatus").textContent = "⚠️ Đã dùng hết 5/5 lượt hỏi cho IP & MAC này. Hãy nhập API key cá nhân (sẽ được mã hóa AES-GCM) hoặc bấm '⚡ Chạy Demo Thực Tế (0 Credit)'.";
+    if ($("keyBadge")) $("keyBadge").textContent = "🔴 Hết 5/5 lượt";
   }
 
   if (fc) fc.updateModelLabels(strat);
@@ -162,14 +187,12 @@ function refreshKeyStatus() {
   }
 }
 
-$("saveKey").onclick = () => {
+$("saveKey").onclick = async () => {
   const v = $("apiKey").value.trim();
-  if (!v) {
-    localStorage.removeItem(KEY_LS);
-    refreshKeyStatus();
-    return;
+  if (typeof CryptoVault !== "undefined") {
+    await CryptoVault.saveEncryptedKey(v);
   }
-  localStorage.setItem(KEY_LS, v);
+  $("apiKey").value = "";
   refreshKeyStatus();
 };
 
@@ -181,10 +204,27 @@ if ($("modelStrategy")) {
   };
 }
 
-// Khởi tạo Flowchart
+// Khởi tạo Đa ngôn ngữ (50 ngôn ngữ), Flowchart & QuotaGuard (xác định IP + MAC)
+function initLanguageSelector() {
+  if (typeof I18N === "undefined" || !$("langSelect")) return;
+  const langs = I18N.getLanguages();
+  $("langSelect").innerHTML = langs.map((l, idx) =>
+    `<option value="${l.code}">${idx + 1}. ${l.flag} ${l.native} (${l.name})</option>`
+  ).join("");
+  I18N.init();
+  $("langSelect").value = I18N.currentLang;
+  $("langSelect").onchange = () => {
+    I18N.setLanguage($("langSelect").value);
+  };
+}
+
+initLanguageSelector();
 fc = new Flowchart($("flowsvg"), $("flowlog"), $("agent-inspector"));
 refreshKeyStatus();
 refreshProfileInsights();
+if (typeof QuotaGuard !== "undefined") {
+  QuotaGuard.init().then(() => refreshKeyStatus());
+}
 
 // Gắn sự kiện thay đổi form để cập nhật Profile Insights
 ["level", "major", "gpa", "year", "english", "kind", "countries", "note"].forEach(id => {
@@ -223,8 +263,17 @@ if ($("parseCvBtn")) {
     $("parseCvBtn").disabled = true;
     $("cvStatus").textContent = "⏳ Agent Profile Analyzer đang bóc tách thông tin CV...";
     try {
-      const apiKey = (localStorage.getItem(KEY_LS) || "").trim();
-      if (apiKey) {
+      const vaultKey = typeof CryptoVault !== "undefined" ? await CryptoVault.unlockPersonalKey() : "";
+      let apiKey = vaultKey || appState.activeSessionKey;
+      if (!apiKey && typeof QuotaGuard !== "undefined") {
+        const q = await QuotaGuard.consumeTurnAndGetKey();
+        if (q.ok) {
+          apiKey = q.apiKey;
+          appState.activeSessionKey = q.apiKey;
+          refreshKeyStatus();
+        }
+      }
+      if (apiKey && apiKey !== "DEMO") {
         const parsed = await AgentsV2.parseCV(apiKey, raw);
         setProfileToForm(parsed);
       } else {
@@ -254,14 +303,42 @@ async function executePipeline(forceDemo = false) {
     errEl.classList.add("hidden");
   }
 
-  const savedKey = (localStorage.getItem(KEY_LS) || $("apiKey").value || "").trim();
-  const effectiveKey = forceDemo || !savedKey ? "DEMO" : savedKey;
-  const strategyId = $("modelStrategy")?.value || META_CONFIG.defaultStrategy;
-
   const p = getProfileFromForm();
   if (!p.major || !p.gpa) {
     fail("Vui lòng điền Ngành học và GPA trước khi chạy.");
     return;
+  }
+
+  const directInputKey = $("apiKey").value.trim();
+  if (directInputKey && typeof CryptoVault !== "undefined") {
+    await CryptoVault.saveEncryptedKey(directInputKey);
+    $("apiKey").value = "";
+    refreshKeyStatus();
+  }
+  const savedKey = typeof CryptoVault !== "undefined" ? await CryptoVault.unlockPersonalKey() : "";
+  const strategyId = $("modelStrategy")?.value || META_CONFIG.defaultStrategy;
+  let effectiveKey = "DEMO";
+  let runMode = "demo";
+  let quotaLogMsg = null;
+
+  if (forceDemo) {
+    effectiveKey = "DEMO";
+    runMode = "demo";
+  } else if (savedKey) {
+    effectiveKey = savedKey;
+    runMode = "live";
+    appState.activeSessionKey = savedKey;
+  } else if (typeof QuotaGuard !== "undefined") {
+    const qRes = await QuotaGuard.consumeTurnAndGetKey();
+    refreshKeyStatus();
+    if (!qRes.ok) {
+      fail(`${qRes.reason} Vui lòng dán Meta Model API key cá nhân ở mục 🔒 phía trên hoặc bấm nút "⚡ Chạy Demo Thực Tế (0 Credit)" để tiếp tục.`);
+      return;
+    }
+    effectiveKey = qRes.apiKey;
+    runMode = effectiveKey === "DEMO" ? "demo" : "sponsor";
+    appState.activeSessionKey = qRes.apiKey;
+    quotaLogMsg = `🛡️ QuotaGuard: Đã cấp phát lượt hỏi (#${qRes.status.used}/${qRes.status.maxTurns} — Còn lại: ${qRes.status.remaining} lượt) cho IP [${qRes.status.ip}] & Thiết bị MAC [${qRes.status.mac}].`;
   }
 
   appState.profile = p;
@@ -276,7 +353,7 @@ async function executePipeline(forceDemo = false) {
   $("hunt").disabled = true;
   if ($("huntDemo")) $("huntDemo").disabled = true;
 
-  metaStats.reset(effectiveKey === "DEMO" ? "demo" : "live", strategyId);
+  metaStats.reset(runMode, strategyId);
   fc.reset();
   fc.updateModelLabels(strategyId);
   updateKPIs();
@@ -293,8 +370,10 @@ async function executePipeline(forceDemo = false) {
     const { strengths } = AgentsV2.analyzeProfileLocal(p);
     fc.setState("profile", "done");
     fc.log(`👤 Profile Analyzer: Chuẩn hóa hồ sơ (${p.level} · ${p.major} · GPA ${p.gpa} · ${p.english}). Phát hiện ${strengths.length} lợi thế cạnh tranh.`);
-    if (effectiveKey === "DEMO" && !forceDemo) {
-      fc.log("⚡ Chưa có API key trong trình duyệt → Tự động kích hoạt Chế độ Demo Mô phỏng Thực tế (Full 10-Node Telemetry).");
+    if (quotaLogMsg) {
+      fc.log(quotaLogMsg);
+    } else if (effectiveKey === "DEMO") {
+      fc.log("⚡ Đang chạy ở Chế độ Demo Mô phỏng Thực tế (Không tiêu tốn lượt hỏi Quota IP/MAC).");
     }
 
     // 1) SUPERVISOR — Chia 3 hướng tìm kiếm theo hồ sơ (Muse Wonder 1.0)
@@ -680,7 +759,8 @@ async function generateStudioForScholarship(idx, apiKeyOverride, signal) {
   }
 
   $("letter").textContent = `⏳ Drafter Agent đang biên soạn Motivation Letter Outline, Lộ trình nộp đơn & Câu hỏi phỏng vấn riêng cho "${target.name}"...`;
-  const effectiveKey = apiKeyOverride || (localStorage.getItem(KEY_LS) || "").trim() || "DEMO";
+  const vaultKey = typeof CryptoVault !== "undefined" ? await CryptoVault.unlockPersonalKey() : "";
+  const effectiveKey = apiKeyOverride || vaultKey || appState.activeSessionKey || "DEMO";
   const letterText = await AgentsV2.draftLetter(effectiveKey, appState.profile || getProfileFromForm(), target, signal);
   appState.letterCache[key] = letterText;
   $("letter").textContent = letterText;
