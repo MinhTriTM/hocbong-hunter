@@ -1,0 +1,80 @@
+name: 🛡️ Học Bổng Hunter v3.0 — CI/CD & Triple-Verification
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-ci-cd-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  # =========================================================================
+  # STAGE 1: CONTINUOUS INTEGRATION (SYNTAX + SECURITY + E2E 10-NODE PIPELINE)
+  # =========================================================================
+  ci-triple-verification:
+    name: "🔬 CI: Syntax, DOM & 10-Node Multi-Agent E2E Audit"
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 🔍 Check 1 — Validate JavaScript Syntax (All Modules)
+        run: |
+          node --check js/meta.js
+          node --check js/flowchart.js
+          node --check js/agents-v2.js
+          node --check js/app.js
+          node --check tests/verify-pipeline.js
+          echo "✅ All JavaScript modules passed syntax check!"
+
+      - name: 🛡️ Check 2 — Run End-to-End Triple-Verification Suite
+        run: |
+          node tests/verify-pipeline.js
+
+      - name: 📦 Prepare Clean Static Bundle for Deployment
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p _site/css _site/js
+          cp index.html README.md .nojekyll _site/
+          cp css/style.css _site/css/
+          cp js/*.js _site/js/
+
+      - name: 📤 Upload GitHub Pages Artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "_site"
+
+  # =========================================================================
+  # STAGE 2: CONTINUOUS DEPLOYMENT (GITHUB PAGES)
+  # =========================================================================
+  cd-github-pages:
+    name: "🚀 CD: Deploy to GitHub Pages"
+    needs: ci-triple-verification
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 🌐 Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: 🚀 Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

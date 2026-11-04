@@ -3,32 +3,155 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Học bổng Hunter v2 — Săn học bổng bằng hệ đa agent</title>
+<title>Học Bổng Hunter v3.0 — Hệ Đa Agent & Kiểm Chứng 3 Tầng trên Meta Muse</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <header>
-  <h1>🎯 Học bổng Hunter <span class="v2badge">v2 · multi-agent</span></h1>
-  <p class="subtitle">Nhập profile → <b>Supervisor</b> chia 3 hướng tìm kiếm → <b>3 Researchers</b> chạy song song (Muse Spark + web search) → <b>Extractor</b> → <b>Critic</b> kiểm định độc lập → <b>Matcher</b> → <b>Drafter</b>. Flowchart chạy live bên dưới.</p>
+  <div class="hero-badges">
+    <span class="pill-badge wonder">✨ Meta Muse Wonder 1.0 · 1M Context</span>
+    <span class="pill-badge spark">⚡ Muse Spark 1.3 · Web Search Grounding</span>
+    <span class="pill-badge verify">🛡️ Triple-Verification Protocol</span>
+  </div>
+  <h1>🎯 Học Bổng Hunter <span class="v2badge">v3.0 · Multi-Agent</span></h1>
+  <p class="subtitle">
+    Hệ thống Đa Agent săn học bổng thực tế cho sinh viên Việt Nam:
+    <b>Profile Analyzer</b> → <b>Supervisor (Muse Wonder 1.0)</b> → <b>3 Researchers song song (Muse Spark 1.3 + Web Search)</b> →
+    <b>Deduplicator</b> → <b>Extractor</b> → <b>Triple-Verify Critic</b> → <b>Multi-Matcher</b> → <b>Strategic Drafter</b>.
+  </p>
+
+  <!-- Thanh chỉ số nhanh -->
+  <div class="kpi-strip" id="kpiStrip">
+    <div class="kpi-item">
+      <span class="kpi-val" id="kpiAgents">10 Nodes</span>
+      <span class="kpi-lbl">Kiến trúc Đa Agent</span>
+    </div>
+    <div class="kpi-item">
+      <span class="kpi-val" id="kpiFound">0</span>
+      <span class="kpi-lbl">Học bổng phát hiện</span>
+    </div>
+    <div class="kpi-item">
+      <span class="kpi-val" id="kpiVerified">0</span>
+      <span class="kpi-lbl">Đạt Kiểm chứng 3 Tầng</span>
+    </div>
+    <div class="kpi-item">
+      <span class="kpi-val" id="kpiCost">$0.0000</span>
+      <span class="kpi-lbl">Chi phí API ước tính</span>
+    </div>
+  </div>
 </header>
 
 <main>
-  <!-- API key: chỉ lưu ở trình duyệt, không bao giờ vào repo -->
+  <!-- 1. Cấu hình Meta Model API & Điều phối Đa Model -->
   <section class="card" id="key-card">
-    <h2>🔑 Meta Model API key</h2>
-    <p class="hint">Lấy key miễn phí tại <a href="https://dev.meta.ai" target="_blank" rel="noopener">dev.meta.ai</a> (tài khoản mới được tặng $20 credit — đủ chạy hàng trăm demo). Key chỉ lưu trong localStorage của trình duyệt này.</p>
-    <div class="row">
-      <input type="password" id="apiKey" placeholder="Dán Meta Model API key vào đây" autocomplete="off">
-      <button id="saveKey">Lưu key</button>
+    <div class="card-head-row">
+      <h2>🔑 Meta Model API & Điều phối Đa Model (Muse Hub)</h2>
+      <span class="status-chip" id="keyBadge">⚡ Sẵn sàng (Live / Demo)</span>
     </div>
-    <p class="hint" id="keyStatus">Chưa có key.</p>
+    <p class="hint">
+      Lấy API key tại <a href="https://dev.meta.ai" target="_blank" rel="noopener">dev.meta.ai</a> ($20 free credit hoặc $150 Hackathon credit).
+      Key <b>chỉ lưu cục bộ trong localStorage trình duyệt</b>, gọi trực tiếp tới <code>https://api.meta.ai/v1/responses</code>.
+      Nếu chưa có key, bạn có thể bấm <b>⚡ Chạy Demo Thực Tế</b> ngay bên dưới!
+    </p>
+
+    <div class="grid-2col">
+      <label>Meta Model API Key (MODEL_API_KEY)
+        <div class="row">
+          <input type="password" id="apiKey" placeholder="Dán Meta Model API key (hoặc để trống để chạy Demo)..." autocomplete="off">
+          <button id="saveKey" type="button">💾 Lưu key</button>
+        </div>
+      </label>
+
+      <label>Chiến lược Điều phối Đa Model (Multi-Model Routing)
+        <select id="modelStrategy">
+          <option value="hybrid-wonder-spark">🔥 Hybrid Frontier: Muse Wonder 1.0 (Planner/Critic) + Spark 1.3 (Search)</option>
+          <option value="all-spark-1.3">⚡ Toàn bộ Muse Spark 1.3 ($1.25 in / $4.25 out per 1M)</option>
+          <option value="all-wonder-1.0">✨ Toàn bộ Muse Wonder 1.0 ($4.00 in / $20.00 out per 1M)</option>
+          <option value="contributor-eco">🌱 Siêu Tiết Kiệm: Muse Spark 1.3 Contributor ($0.10 / $0.20 · -95% phí)</option>
+        </select>
+      </label>
+    </div>
+
+    <p class="hint" id="keyStatus">Chưa lưu API key — Hệ thống sẽ tự động kích hoạt Chế độ Demo Thực Tế nếu bạn bấm Săn ngay.</p>
+
+    <!-- Bảng thông số Hệ sinh thái Meta Muse Models -->
+    <details class="model-catalog-drawer">
+      <summary>📚 Xem Bảng Thông Số & Giá Chính Thức Hệ Sinh Thái Meta Muse (1M Context)</summary>
+      <div class="model-table-wrap">
+        <table class="model-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Phân loại & Context</th>
+              <th>Vai trò trong Học Bổng Hunter</th>
+              <th>Input / Cached / Output (1M)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Muse Wonder 1.0</b> <span class="mini-tag new">New</span></td>
+              <td>Chat · 1M Context</td>
+              <td><b>Supervisor, Triple-Verify Critic & Drafter</b> (Lập kế hoạch, điều phối sub-agents & tự phục hồi lỗi)</td>
+              <td>$4.00 / $0.20 / $20.00</td>
+            </tr>
+            <tr>
+              <td><b>Muse Spark 1.3</b></td>
+              <td>Chat · 1M Context</td>
+              <td><b>3 Parallel Researchers, Extractor & Matcher</b> (Web search grounding, native tool calling, ít token hơn 1.2)</td>
+              <td>$1.25 / $0.15 / $4.25</td>
+            </tr>
+            <tr>
+              <td><b>Muse Spark 1.3 Contributor</b></td>
+              <td>Chat · 1M Context</td>
+              <td>Chế độ tiết kiệm 95% chi phí cho sinh viên & builder</td>
+              <td>$0.10 / $0.002 / $0.20</td>
+            </tr>
+            <tr>
+              <td><b>Muse Spark Open & Glimmer (30B)</b></td>
+              <td>Open Weights</td>
+              <td>Hỗ trợ triển khai Self-hosted / Local Agent (Apache 2.0 / Muse License)</td>
+              <td>Open / Local GPU</td>
+            </tr>
+            <tr>
+              <td><b>SAM 3.1 / Muse Image 1.0 / Voice</b></td>
+              <td>Multimodal</td>
+              <td>Mở rộng xử lý ảnh minh chứng, tạo banner học thuật & nhập hồ sơ giọng nói</td>
+              <td>$0.01/img · $0.18/hr audio</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
   </section>
 
-  <!-- Profile -->
+  <!-- 2. Hồ sơ ứng viên + Presets + AI CV Parser -->
   <section class="card">
-    <h2>👤 Hồ sơ của bạn</h2>
+    <div class="card-head-row">
+      <h2>👤 Hồ sơ Học thuật của Bạn</h2>
+      <div class="preset-bar">
+        <span class="hint">Hồ sơ mẫu 1-Click:</span>
+        <button type="button" class="chip-btn" data-preset="it-master">💻 CNTT / AI (GPA 3.6)</button>
+        <button type="button" class="chip-btn" data-preset="biz-gov">📈 Kinh tế (GPA 3.4)</button>
+        <button type="button" class="chip-btn" data-preset="stem-phd">🔬 Nghiên cứu STEM (GPA 3.8)</button>
+        <button type="button" class="chip-btn" data-preset="exchange-ug">✈️ SV Năm 2 Trao đổi</button>
+      </div>
+    </div>
+
+    <!-- Tiện ích dán nhanh CV / Bảng điểm để AI tự điền -->
+    <details class="cv-parser-drawer" id="cvDrawer">
+      <summary>📄 Dán nhanh CV / Bảng điểm hoặc tải file (.txt, .md) để AI tự động điền hồ sơ</summary>
+      <div class="cv-parser-body">
+        <textarea id="cvRawInput" rows="3" placeholder="Dán tóm tắt CV, bảng điểm, thành tích nghiên cứu hoặc tải file văn bản lên đây..."></textarea>
+        <div class="row cv-actions">
+          <input type="file" id="cvFileInput" accept=".txt,.md,.json,.csv" style="max-width:260px">
+          <button type="button" id="parseCvBtn">🪄 AI Trích xuất Hồ sơ vào Form</button>
+          <span class="hint" id="cvStatus"></span>
+        </div>
+      </div>
+    </details>
+
     <div class="grid">
-      <label>Bậc học
+      <label>Bậc học mục tiêu
         <select id="level">
           <option>Đại học</option>
           <option>Cao học (Thạc sĩ)</option>
@@ -36,10 +159,10 @@
           <option>THPT</option>
         </select>
       </label>
-      <label>Ngành học <input id="major" value="Công nghệ thông tin" placeholder="VD: Công nghệ thông tin"></label>
-      <label>GPA (thang 4.0) <input id="gpa" value="3.2" inputmode="decimal" placeholder="VD: 3.2"></label>
-      <label>Năm học <input id="year" value="Năm 3" placeholder="VD: Năm 3"></label>
-      <label>Chứng chỉ tiếng Anh <input id="english" value="IELTS 6.5" placeholder="VD: IELTS 6.5"></label>
+      <label>Ngành học <input id="major" value="Công nghệ thông tin & Trí tuệ nhân tạo" placeholder="VD: Công nghệ thông tin"></label>
+      <label>GPA (thang 4.0) <input id="gpa" value="3.45" inputmode="decimal" placeholder="VD: 3.45"></label>
+      <label>Năm học / Hiện trạng <input id="year" value="Năm 3" placeholder="VD: Năm 3, Năm cuối, Đã tốt nghiệp"></label>
+      <label>Chứng chỉ Ngoại ngữ <input id="english" value="IELTS 6.5" placeholder="VD: IELTS 6.5, JLPT N2, TOPIK 4"></label>
       <label>Loại học bổng mong muốn
         <select id="kind">
           <option>Du học toàn phần</option>
@@ -48,38 +171,106 @@
           <option>Ngắn hạn / trao đổi</option>
         </select>
       </label>
-      <label>Quốc gia / khu vực ưu tiên <input id="countries" value="Nhật, Hàn, Úc, châu Âu" placeholder="VD: Nhật, Hàn, Úc"></label>
-      <label>Hoàn cảnh đặc biệt (không bắt buộc) <input id="note" placeholder="VD: hộ nghèo, dân tộc thiểu số..."></label>
+      <label>Quốc gia / Khu vực ưu tiên <input id="countries" value="Nhật, Hàn, Úc, châu Âu" placeholder="VD: Nhật, Hàn, Úc, Mỹ"></label>
+      <label>Thành tích / Hoàn cảnh đặc biệt <input id="note" value="Giải Nhì NCKH Sinh viên, 1 bài báo khoa học" placeholder="VD: Giải NCKH, Hackathon, hộ nghèo..."></label>
     </div>
-    <button id="hunt" class="primary">🚀 Săn học bổng</button>
+
+    <!-- Đánh giá nhanh hồ sơ từ Profile Analyzer -->
+    <div id="profileInsights" class="profile-insights"></div>
+
+    <div class="action-buttons-row">
+      <button id="hunt" class="primary" type="button">🚀 Săn Học Bổng Ngay (Multi-Agent Pipeline)</button>
+      <button id="huntDemo" class="secondary-cta" type="button" title="Chạy mô phỏng toàn bộ 10-Node Agent với dữ liệu học bổng 2026-2027 thực tế mà không tốn API credit">⚡ Chạy Demo Thực Tế (0 Credit)</button>
+    </div>
   </section>
 
-  <!-- Pipeline: flowchart live -->
+  <!-- 3. Pipeline: Flowchart Live + Agent Inspector -->
   <section class="card hidden" id="pipeline-card">
-    <h2>⚙️ Hệ đa agent đang chạy <span class="hint">— node sáng là đang chạy, xanh là xong</span></h2>
-    <svg id="flowsvg" role="img" aria-label="Flowchart pipeline 7 agent"></svg>
+    <div class="card-head-row">
+      <h2>⚙️ Trung tâm Điều hành Đa Agent <span class="hint">— Bấm vào từng Node để soi Input/Output & Latency</span></h2>
+      <span class="badge-pill brand" id="activeStrategyBadge">Hybrid Frontier</span>
+    </div>
+    <svg id="flowsvg" role="img" aria-label="Flowchart pipeline 10 nodes"></svg>
+
+    <!-- Khung Inspector khi click vào 1 node trên Flowchart -->
+    <div id="agent-inspector" class="agent-inspector hidden"></div>
+
     <div id="flowlog" aria-live="polite"></div>
     <p class="hint" id="stepStatus"></p>
   </section>
 
-  <!-- Results -->
+  <!-- 4. Kết quả Học bổng + Bộ lọc + So sánh + Xuất báo cáo -->
   <section class="card hidden" id="results-card">
-    <h2>🏆 Học bổng phù hợp</h2>
+    <div class="card-head-row">
+      <h2>🏆 Học Bổng Đã Qua Kiểm Chứng <span class="hint" id="resultsSummaryCount"></span></h2>
+      <div class="export-bar">
+        <button type="button" class="sm-btn" id="openCompareBtn">⚖️ So sánh (<span id="compareCount">0</span>)</button>
+        <button type="button" class="sm-btn" id="exportJson">⬇️ JSON</button>
+        <button type="button" class="sm-btn" id="exportCsv">📊 CSV (Excel)</button>
+        <button type="button" class="sm-btn" id="exportMd">📝 Báo cáo .MD</button>
+      </div>
+    </div>
+
+    <!-- Thanh công cụ Lọc & Sắp xếp -->
+    <div class="filter-bar">
+      <input type="search" id="searchFilter" placeholder="🔍 Tìm theo tên học bổng, quốc gia, tổ chức...">
+      <select id="tierFilter">
+        <option value="all">🛡️ Tất cả nguồn đã duyệt</option>
+        <option value="official">🏛️ Chỉ Cổng Chính Thức (.gov/.edu/.org)</option>
+        <option value="open">🟢 Đang mở đơn / Sắp hết hạn</option>
+        <option value="saved">⭐ Đã lưu yêu thích</option>
+      </select>
+      <select id="sortBy">
+        <option value="score">📊 Sắp xếp: Điểm Phù Hợp giảm dần</option>
+        <option value="trust">🛡️ Sắp xếp: Độ Tin Cậy (Trust Score) giảm dần</option>
+        <option value="deadline">⏰ Sắp xếp: Ưu tiên hạn nộp gần nhất</option>
+      </select>
+    </div>
+
+    <!-- Khung So sánh Học bổng (Hiện khi chọn >= 2 học bổng) -->
+    <div id="compare-panel" class="compare-panel hidden"></div>
+
     <div id="results"></div>
   </section>
 
-  <!-- Letter -->
+  <!-- 5. AI Application Studio: Dàn ý Thư động lực + Checklist Hồ sơ + Phỏng vấn -->
   <section class="card hidden" id="letter-card">
-    <h2>✍️ Dàn ý thư động lực <span class="hint" id="letterFor"></span></h2>
-    <div id="letter" class="letter"></div>
-    <button id="copyLetter">📋 Copy dàn ý</button>
+    <div class="card-head-row">
+      <h2>✍️ AI Application Studio <span class="hint" id="letterFor"></span></h2>
+      <div class="studio-controls">
+        <select id="targetScholarshipSelect" title="Chọn học bổng khác để soạn bộ hồ sơ"></select>
+        <button type="button" class="sm-btn" id="regenerateLetterBtn">🔄 Soạn cho học bổng này</button>
+      </div>
+    </div>
+
+    <!-- Tabs chuyển đổi giữa Bài luận & Checklist tương tác -->
+    <div class="studio-tabs">
+      <button type="button" class="tab-btn active" data-tab="tab-letter">📝 Motivation Letter, Lộ trình & Phỏng vấn</button>
+      <button type="button" class="tab-btn" data-tab="tab-checklist">✅ Checklist Hồ sơ Cá nhân hóa (<span id="chkProgressText">0/8</span>)</button>
+    </div>
+
+    <div id="tab-letter" class="tab-pane">
+      <div id="letter" class="letter"></div>
+      <div class="row" style="margin-top:14px">
+        <button id="copyLetter" type="button">📋 Copy toàn bộ dàn ý</button>
+        <button id="downloadLetterMd" type="button">⬇️ Tải Dàn ý (.md)</button>
+      </div>
+    </div>
+
+    <div id="tab-checklist" class="tab-pane hidden">
+      <p class="hint">Đánh dấu các giấy tờ bạn đã chuẩn bị. Trạng thái được lưu tự động trong trình duyệt cho từng học bổng.</p>
+      <div id="checklistBox" class="checklist-box"></div>
+    </div>
   </section>
 
-  <p class="hint" id="error"></p>
+  <p class="hint hidden" id="error"></p>
 </main>
 
 <footer>
-  <p>Học bổng Hunter v2 — bài dự thi Meta Global AI Developer Hackathon (track Indie Developers, problem statement: Agentic Workflows). Chạy bằng Muse Spark 1.3 qua Meta Model API. Code mới 100% trong thời gian sự kiện.</p>
+  <p>
+    <b>Học Bổng Hunter v3.0</b> — Bài dự thi <b>Meta Global AI Developer Hackathon</b> (Track: Indie Developers · Problem Statement: <i>Agentic Workflows</i>).<br>
+    Vận hành bởi hệ sinh thái <b>Meta Muse Wonder 1.0 &amp; Muse Spark 1.3</b> qua <code>https://api.meta.ai/v1/responses</code> kèm Giao thức Kiểm chứng Độc lập 3 Tầng (Triple-Verification Protocol).
+  </p>
 </footer>
 
 <script src="js/meta.js"></script>
