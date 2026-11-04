@@ -5,8 +5,10 @@
 [![Meta Models](https://img.shields.io/badge/Meta_Muse-Wonder_1.0_%2B_Spark_1.3-0866FF.svg)](https://dev.meta.ai)
 [![Languages](https://img.shields.io/badge/i18n-50_Global_Languages-8b5cf6.svg)](js/i18n.js)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-GitHub_Pages-10b981.svg)](https://minhtritm.github.io/hocbong-hunter/)
+[![3-Min Demo Video](https://img.shields.io/badge/YouTube-3--Min_Demo_Video-FF0000.svg)](https://youtu.be/5LXRnpNLMII)
 
 > 🌐 **Live Production Demo**: **[https://minhtritm.github.io/hocbong-hunter/](https://minhtritm.github.io/hocbong-hunter/)**
+> 🎬 **3-Minute Hackathon Demo Video**: **[https://youtu.be/5LXRnpNLMII](https://youtu.be/5LXRnpNLMII)**
 > 🏆 **Built for the Meta Global AI Developer Hackathon (Meta & Cerebral Valley)**
 > - **Track**: Indie Developer Track
 > - **Theme**: Build for Your World & Push the Frontier (Multi-Model Agentic Workflows)

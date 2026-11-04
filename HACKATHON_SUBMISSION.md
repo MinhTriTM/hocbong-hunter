@@ -67,7 +67,9 @@ https://github.com/MinhTriTM/hocbong-hunter
 ```
 
 ### 8. `3-Minute Demo Video *`
-- Dán link YouTube (chế độ **Public** hoặc **Unlisted**) hoặc link Loom của video 3 phút sau khi bạn quay xong.
+```text
+https://youtu.be/5LXRnpNLMII
+```
 
 ### 9. `Describe your use of Meta products to build the submitted project *`
 Copy toàn bộ đoạn dưới đây dán vào ô này:
