@@ -58,6 +58,14 @@ const MUSE_MODELS = {
     desc: "Model đa phương thức nền tảng cho tác vụ agentic nhiều bước.",
     pricing: { input: 1.25, cached: 0.15, output: 4.25 },
   },
+  "muse-voice-transcribe": {
+    id: "muse-voice-transcribe",
+    name: "Muse Voice Transcribe (Audio STT · $0.18/hr)",
+    badge: "🎙️ Muse Voice Transcribe",
+    context: "Audio",
+    desc: "Model nhận diện giọng nói (Speech-to-Text), phân biệt người nói (Speaker Diarization) & phát hiện khoảng lặng (VAD) cho Agent #11 Mock Interview.",
+    pricing: { input: 0.18, cached: 0.18, output: 0.18 },
+  },
 };
 
 // Chiến lược phân bổ Model cho từng Agent trong Pipeline

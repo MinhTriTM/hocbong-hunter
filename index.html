@@ -18,6 +18,7 @@
       <select id="langSelect" title="Chọn ngôn ngữ (50 Languages Supported)"></select>
     </div>
     <button type="button" id="themeToggleBtn" class="pill-badge" style="cursor:pointer" title="Chuyển đổi giao diện Tối / Sáng">🌓 Giao diện</button>
+    <button type="button" id="autoPitchBtn" class="pill-badge pill-gold" style="cursor:pointer;font-weight:700" title="Tự động phát thuyết trình tiếng Anh 3 phút (TTS) kèm Phụ đề & Tự động chạy Demo">🎬 Auto-Pitch 3m (TTS)</button>
   </div>
   <h1><span data-i18n="appTitle">🎯 Học Bổng Hunter</span> <span class="v2badge">v4.0 · 12-Node · 50 Languages</span></h1>
   <p class="subtitle" data-i18n="subtitle">
@@ -331,10 +332,33 @@
   <p class="hint hidden" id="error"></p>
 </main>
 
+<!-- Thanh Phụ đề & Trình điều khiển Thuyết trình Tự động 3 Phút (Auto-Pitch TTS) -->
+<div id="pitchTeleprompter" class="pitch-teleprompter hidden" role="region" aria-label="3-Minute Hackathon Pitch Player">
+  <div class="pitch-top-row">
+    <div class="pitch-badge-group">
+      <span class="pitch-live-dot"></span>
+      <strong id="pitchSegTitle">🎬 3-Minute Hackathon Auto-Pitch (AI TTS Voiceover)</strong>
+      <span id="pitchTimerText" class="pitch-timer">00:00 / 02:53</span>
+    </div>
+    <div class="pitch-actions">
+      <a href="demo_voiceover/hocbong_hunter_3min_pitch_full.mp3" download="HocBong_Hunter_v4_3Min_Pitch.mp3" class="sm-btn" style="text-decoration:none;padding:4px 10px;font-size:0.78rem">⬇️ Tải MP3</a>
+      <a href="demo_voiceover/hocbong_hunter_3min_pitch_subtitles.srt" download="HocBong_Hunter_v4_Subtitles.srt" class="sm-btn" style="text-decoration:none;padding:4px 10px;font-size:0.78rem">📝 Tải SRT</a>
+      <button type="button" id="pitchPlayPauseBtn" class="sm-btn" style="padding:4px 10px;font-size:0.78rem">⏸️ Tạm dừng</button>
+      <button type="button" id="pitchCloseBtn" class="sm-btn" style="padding:4px 10px;font-size:0.78rem">✖ Đóng</button>
+    </div>
+  </div>
+  <div class="pitch-progress-track">
+    <div id="pitchProgressBar" class="pitch-progress-fill" style="width:0%"></div>
+  </div>
+  <div id="pitchSubtitleText" class="pitch-subtitle-text">
+    "Hello Meta and Cerebral Valley judges! My name is Doan Minh Tri, an indie developer from Vietnam. First, please accept my sincere apologies: because my spoken English is not very fluent yet, I kindly ask for your permission to use AI Text-to-Speech so I can present my project clearly within the three-minute limit..."
+  </div>
+</div>
+
 <footer>
   <p>
-    <b>Học Bổng Hunter v3.0</b> — Bài dự thi <b>Meta Global AI Developer Hackathon</b> (Track: Indie Developers · Problem Statement: <i>Agentic Workflows</i>).<br>
-    Vận hành bởi hệ sinh thái <b>Meta Muse Wonder 1.0 &amp; Muse Spark 1.3</b> qua <code>https://api.meta.ai/v1/responses</code> kèm Giao thức Kiểm chứng Độc lập 3 Tầng (Triple-Verification Protocol).
+    <b>Học Bổng Hunter v4.0</b> — Bài dự thi <b>Meta Global AI Developer Hackathon</b> (Track: Indie Developers · Problem Statement: <i>Build for Your World &amp; Agentic Workflows</i>).<br>
+    Vận hành bởi hệ sinh thái <b>Meta Muse Wonder 1.0, Muse Spark 1.3 &amp; Muse Voice Transcribe</b> qua <code>https://api.meta.ai/v1/responses</code> kèm Giao thức Kiểm chứng Độc lập 3 Tầng (Triple-Verification Protocol).
   </p>
 </footer>
 

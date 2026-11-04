@@ -1147,3 +1147,193 @@ if ($("exportMd")) {
     triggerDownload("Bao-Cao-Hoc-Bong-Hunter-v3.md", lines.join("\n"), "text/markdown;charset=utf-8");
   };
 }
+
+// --- TRÌNH THUYẾT TRÌNH TỰ ĐỘNG 3 PHÚT (AUTO-PITCH TTS + SUBTITLES + AUTO UI CHOREOGRAPHY) ---
+const PITCH_MANIFEST = {
+  totalDuration: 173.93,
+  audioSrc: "demo_voiceover/hocbong_hunter_3min_pitch_full.mp3",
+  segments: [
+    {
+      index: 1,
+      id: "01_intro_apology",
+      title: "🎬 [1/6] Intro & Polite Apology for Using TTS",
+      action: "intro",
+      startTime: 0.0,
+      endTime: 30.53,
+      text: "Hello Meta and Cerebral Valley judges! My name is Doan Minh Tri, an indie developer from Vietnam. First, please accept my sincere apologies: because my spoken English is not very fluent yet, I kindly ask for your permission to use AI Text-to-Speech so I can present my project clearly within the three-minute limit. Today, I am excited to introduce Hoc Bong Hunter version 4.0 — an open-source, 12-node multi-agent scholarship ecosystem powered by Meta Muse Wonder 1.0 and Muse Spark 1.3."
+    },
+    {
+      index: 2,
+      id: "02_problem_and_i18n",
+      title: "🌍 [2/6] Problem Statement, 50 Languages & QuotaGuard Security",
+      action: "switch_lang_and_theme",
+      startTime: 31.13,
+      endTime: 58.76,
+      text: "Every year, millions of students miss out on life-changing international scholarships because portals are scattered across languages, commercial agencies charge thousands of dollars, and standard LLMs often hallucinate expired deadlines or fake links. To solve this for students worldwide, Hoc Bong Hunter supports 50 global languages with automatic right-to-left layout, Light and Dark themes, and five free sponsored live API runs per IP and device MAC address via our QuotaGuard security engine."
+    },
+    {
+      index: 3,
+      id: "03_profile_and_radar",
+      title: "🕸️ [3/6] AI CV Parser, 1-Click Presets & 5-Axis SVG Radar Chart",
+      action: "select_preset_and_radar",
+      startTime: 59.36,
+      endTime: 81.54,
+      text: "Let's see how it works in real time. A student can either paste their raw resume into our AI CV Parser powered by Muse Spark 1.3, or select a one-click student preset. Immediately, Node 1 analyzes their academic profile and renders a live 5-Axis SVG Radar Chart, comparing their GPA, IELTS score, and research experience against a Full Scholarship Benchmark."
+    },
+    {
+      index: 4,
+      id: "04_multi_agent_pipeline",
+      title: "🧠 [4/6] 12-Node Pipeline & Muse Wonder 1.0 + Spark 1.3 Routing",
+      action: "run_pipeline_and_inspect",
+      startTime: 82.14,
+      endTime: 115.81,
+      text: "Now, when we trigger the 12-node pipeline, our Heterogeneous Router pairs Meta's newest models over the official v1 responses API. Node 2, powered by Muse Wonder 1.0, acts as the Supervisor and designs a three-lane search strategy. It then fans out to three parallel Muse Spark 1.3 Researcher agents executing concurrent web searches. Clicking any node on our interactive SVG flowchart opens the live Telemetry Inspector — showing the exact input prompt, JSON output, model ID, token usage, latency, and USD cost."
+    },
+    {
+      index: 5,
+      id: "05_triple_verification",
+      title: "🛡️ [5/6] Triple-Verification Protocol & Side-by-Side Comparison",
+      action: "show_verification_and_compare",
+      startTime: 116.41,
+      endTime: 144.10,
+      text: "To completely eliminate AI hallucinations, Node 8 runs our Triple-Verification Engine. Using Muse Wonder 1.0 in a fresh context window alongside deterministic checks, it audits official dot-gov and dot-edu domains, validates 2026 to 2027 deadlines, and cross-checks GPA and language requirements to compute a transparent Trust Score up to 99 percent. Students can also select multiple verified cards to compare them side-by-side."
+    },
+    {
+      index: 6,
+      id: "06_studio_and_outro",
+      title: "🎙️ [6/6] AI Mock Interviewer (#11), Essay Critic (#12) & Export",
+      action: "run_studio_interview_and_essay",
+      startTime: 144.70,
+      endTime: 173.93,
+      text: "Finally, in our AI Application Studio, Muse Wonder 1.0 drafts a tailored Motivation Letter and a three-stage roadmap. Agent 11 serves as an AI Mock Interview Coach with voice recognition and STAR method grading, while Agent 12 acts as an AI Essay Critic that detects clichés and rewrites weak drafts into polished academic English. Students can export deadlines to Google or Apple Calendar via dot-ICS or print an A4 PDF report. Thank you Meta and Cerebral Valley for this incredible hackathon!"
+    }
+  ]
+};
+
+let pitchAudio = null;
+let pitchTriggeredActions = new Set();
+
+function formatClock(sec) {
+  const s = Math.max(0, Math.floor(sec || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+}
+
+function triggerPitchChoreography(action) {
+  if (pitchTriggeredActions.has(action)) return;
+  pitchTriggeredActions.add(action);
+
+  if (action === "intro") {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } else if (action === "switch_lang_and_theme") {
+    if (typeof I18nEngine !== "undefined") {
+      I18nEngine.applyLanguage("en");
+      if ($("langSelect")) $("langSelect").value = "en";
+    }
+    const keyCard = $("key-card");
+    if (keyCard) keyCard.scrollIntoView({ behavior: "smooth", block: "center" });
+  } else if (action === "select_preset_and_radar") {
+    const presetBtn = document.querySelector('.preset-btn[data-preset="uk_chevening"]') || document.querySelector(".preset-btn");
+    if (presetBtn) presetBtn.click();
+    const radarCard = $("radarChartBox");
+    if (radarCard) radarCard.scrollIntoView({ behavior: "smooth", block: "center" });
+  } else if (action === "run_pipeline_and_inspect") {
+    const flowCard = $("pipeline-card");
+    if (flowCard) flowCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!appState.running && appState.rankedList.length === 0) {
+      runPipeline(true);
+    }
+    setTimeout(() => {
+      if (typeof Flowchart !== "undefined" && typeof Flowchart.selectNode === "function") {
+        Flowchart.selectNode("supervisor");
+      }
+    }, 3500);
+  } else if (action === "show_verification_and_compare") {
+    const resCard = $("results-card");
+    if (resCard) resCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => {
+      if ($("openCompareBtn") && appState.rankedList.length >= 2) {
+        $("openCompareBtn").click();
+      }
+    }, 3000);
+  } else if (action === "run_studio_interview_and_essay") {
+    const letterCard = $("letter-card");
+    if (letterCard) letterCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => {
+      if ($("interviewAnswer") && !$("interviewAnswer").value.trim()) {
+        $("interviewAnswer").value = "During my junior year at HUST, our hospital AI triage project faced a severe data imbalance (Situation). As team lead, I needed to boost minority class recall above 90% within two weeks (Task). I designed a synthetic augmentation pipeline and collaborated with three doctors to audit edge cases (Action). As a result, our F1-score improved from 78% to 94.6% and won First Prize at the National Student Research Awards (Result).";
+      }
+      if ($("evalInterviewBtn")) $("evalInterviewBtn").click();
+    }, 2000);
+    setTimeout(() => {
+      if ($("sampleEssayBtn")) $("sampleEssayBtn").click();
+      if ($("reviewEssayBtn")) $("reviewEssayBtn").click();
+    }, 7000);
+  }
+}
+
+function startAutoPitch() {
+  const teleprompter = $("pitchTeleprompter");
+  if (teleprompter) teleprompter.classList.remove("hidden");
+
+  if (!pitchAudio) {
+    pitchAudio = new Audio(PITCH_MANIFEST.audioSrc);
+    pitchAudio.addEventListener("timeupdate", () => {
+      const cur = pitchAudio.currentTime;
+      const tot = pitchAudio.duration || PITCH_MANIFEST.totalDuration;
+      if ($("pitchTimerText")) {
+        $("pitchTimerText").textContent = `${formatClock(cur)} / ${formatClock(tot)}`;
+      }
+      if ($("pitchProgressBar")) {
+        $("pitchProgressBar").style.width = `${Math.min(100, (cur / tot) * 100).toFixed(1)}%`;
+      }
+      const activeSeg = PITCH_MANIFEST.segments.find(s => cur >= s.startTime && cur <= s.endTime + 0.6)
+        || PITCH_MANIFEST.segments[PITCH_MANIFEST.segments.length - 1];
+      if (activeSeg) {
+        if ($("pitchSegTitle")) $("pitchSegTitle").textContent = activeSeg.title;
+        if ($("pitchSubtitleText")) $("pitchSubtitleText").textContent = `"${activeSeg.text}"`;
+        triggerPitchChoreography(activeSeg.action);
+      }
+    });
+    pitchAudio.addEventListener("ended", () => {
+      if ($("pitchPlayPauseBtn")) $("pitchPlayPauseBtn").textContent = "🔄 Phát lại";
+    });
+  }
+
+  pitchTriggeredActions.clear();
+  pitchAudio.currentTime = 0;
+  pitchAudio.play().then(() => {
+    if ($("pitchPlayPauseBtn")) $("pitchPlayPauseBtn").textContent = "⏸️ Tạm dừng";
+    triggerPitchChoreography("intro");
+  }).catch(err => {
+    setError("Không thể tự động phát file MP3: " + err.message);
+  });
+}
+
+if ($("autoPitchBtn")) {
+  $("autoPitchBtn").onclick = () => startAutoPitch();
+}
+
+if ($("pitchPlayPauseBtn")) {
+  $("pitchPlayPauseBtn").onclick = () => {
+    if (!pitchAudio) {
+      startAutoPitch();
+      return;
+    }
+    if (pitchAudio.paused) {
+      pitchAudio.play();
+      $("pitchPlayPauseBtn").textContent = "⏸️ Tạm dừng";
+    } else {
+      pitchAudio.pause();
+      $("pitchPlayPauseBtn").textContent = "▶️ Tiếp tục";
+    }
+  };
+}
+
+if ($("pitchCloseBtn")) {
+  $("pitchCloseBtn").onclick = () => {
+    if (pitchAudio) pitchAudio.pause();
+    if ($("pitchTeleprompter")) $("pitchTeleprompter").classList.add("hidden");
+  };
+}
