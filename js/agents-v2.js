@@ -445,5 +445,94 @@ Giữ văn phong súc tích, chuyên nghiệp, truyền cảm hứng và không 
       items.push({ id: "chk_extra", label: `Minh chứng thành tích / hoàn cảnh đặc biệt (${p.note})`, category: "Ưu tiên" });
     }
     return items;
+  },
+
+  // ── 9) RADAR GAP ANALYSIS: Tính toán 5 trục năng lực ứng viên vs Chuẩn Học Bổng Toàn Phần ──
+  computeRadarMetrics(p) {
+    const gpaNum = parseFloat(String(p.gpa || "0").replace(",", ".")) || 3.0;
+    const gpaScore = Math.max(30, Math.min(100, Math.round((gpaNum / 4.0) * 100)));
+
+    const eng = String(p.english || "").toUpperCase();
+    let engScore = 55;
+    const ieltsM = eng.match(/IELTS\s*(\d(?:\.\d)?)/);
+    if (ieltsM) {
+      engScore = Math.min(100, Math.round((parseFloat(ieltsM[1]) / 8.0) * 100));
+    } else if (eng.includes("N1") || eng.includes("N2") || eng.includes("TOPIK") || eng.includes("TOEFL")) {
+      engScore = 86;
+    }
+
+    const noteLower = String(p.note || "").toLowerCase();
+    const resScore = (noteLower.includes("nckh") || noteLower.includes("bài báo") || noteLower.includes("paper") || noteLower.includes("q1") || noteLower.includes("research"))
+      ? 92
+      : noteLower.length > 10 ? 74 : 58;
+
+    const leadScore = (noteLower.includes("clb") || noteLower.includes("chủ tịch") || noteLower.includes("giải") || noteLower.includes("hackathon") || noteLower.includes("cộng đồng"))
+      ? 90
+      : noteLower.length > 5 ? 76 : 62;
+
+    const alignScore = (p.major && p.countries) ? 92 : 75;
+
+    return {
+      axes: [
+        { label: "GPA Học thuật", user: gpaScore, target: 85 },
+        { label: "Ngoại ngữ", user: engScore, target: 82 },
+        { label: "Nghiên cứu (NCKH)", user: resScore, target: 80 },
+        { label: "Lãnh đạo & Giải thưởng", user: leadScore, target: 80 },
+        { label: "Độ khớp Chiến lược", user: alignScore, target: 85 },
+      ],
+      overallReadiness: Math.round((gpaScore + engScore + resScore + leadScore + alignScore) / 5),
+    };
+  },
+
+  // ── 10) AGENT #11 — AI MOCK INTERVIEW COACH & EVALUATOR (Muse Wonder 1.0) ──
+  getInterviewQuestionsForTarget(target) {
+    const org = target?.org || "Hội đồng Học bổng";
+    const name = target?.name || "Học bổng Quốc tế";
+    return [
+      `[Câu 1 - Động lực & Tầm nhìn]: Tại sao bạn chọn ứng tuyển "${name}" của ${org} tại thời điểm này mà không phải các chương trình khác?`,
+      `[Câu 2 - Năng lực Giải quyết Vấn đề (STAR)]: Hãy kể về một thử thách học thuật hoặc dự án kỹ thuật khó khăn nhất bạn từng vượt qua và bài học rút ra?`,
+      `[Câu 3 - Cam kết Đóng góp]: Sau khi hoàn thành chương trình học với sự tài trợ của ${org}, kế hoạch 3–5 năm của bạn để tạo tác động thực tế là gì?`,
+    ];
+  },
+
+  async evaluateInterviewAnswer(apiKey, p, target, question, userAnswer, signal) {
+    const input =
+`Bạn là Giám khảo Phỏng vấn Học bổng Quốc tế Cấp cao (Interview Evaluator Agent — chạy trên Meta Muse Wonder 1.0).
+${langHint()}
+Hồ sơ ứng viên: ${profileText(p)}
+Học bổng mục tiêu: ${target.name} (${target.org})
+Câu hỏi phỏng vấn: "${question}"
+Câu trả lời của ứng viên: "${userAnswer}"
+
+Hãy chấm điểm và phản biện câu trả lời theo cấu trúc chuẩn STAR (Situation - Task - Action - Result):
+1. 🎯 ĐIỂM SỐ (0–100) & ĐÁNH GIÁ TỔNG QUAN (1-2 câu sắc bén).
+2. ✅ ĐIỂM MẠNH ĐÃ THỂ HIỆN.
+3. ⚠️ ĐIỂM CẦN CẢI THIỆN (Thiếu số liệu định lượng, chưa gắn kết với sứ mệnh của ${target.org}, v.v.).
+4. 🌟 CÂU TRẢ LỜI MẪU ĐIỂM 10 (Viết bằng tiếng Anh chuẩn phỏng vấn học bổng + giải thích ngắn gọn lý do ghi điểm).`;
+    return metaRespond({ apiKey, input, effort: "low", signal, nodeId: "drafter" });
+  },
+
+  // ── 11) AGENT #12 — AI ESSAY / MOTIVATION LETTER CRITIC & REWRITER (Muse Wonder 1.0) ──
+  async reviewEssayDraft(apiKey, p, target, draftText, signal) {
+    const input =
+`Bạn là Chuyên gia Phản biện Bài luận Học bổng Quốc tế (Essay Critic & Rewriter Agent — chạy trên Meta Muse Wonder 1.0).
+${langHint()}
+Hồ sơ ứng viên: ${profileText(p)}
+Học bổng mục tiêu: ${target.name} (${target.org} · ${target.country})
+
+BẢN NHÁP BÀI LUẬN CỦA ỨNG VIÊN:
+"""
+${String(draftText || "").slice(0, 5000)}
+"""
+
+Hãy phân tích, chấm điểm và nâng cấp bản nháp trên theo 4 phần:
+1. 📊 BẢNG ĐIỂM 4 TIÊU CHÍ (Thang 100):
+   - Opening Hook & Storytelling (Độ cuốn hút mở đầu)
+   - Academic & Research Fit (Độ khớp học thuật với ${p.major})
+   - Leadership & Social Impact (Tầm ảnh hưởng & phẩm chất lãnh đạo)
+   - Clarity, Tone & Originality (Văn phong học thuật & không sáo rỗng)
+2. 🔍 PHÁT HIỆN LỖI & CÂU TỪ SÁO RỖNG (Cliché Check): Chỉ rõ câu nào còn chung chung, thiếu minh chứng định lượng.
+3. ✨ BẢN VIẾT LẠI NÂNG CẤP CHUẨN HỌC BỔNG TOÀN PHẦN (Polished Academic Version bằng tiếng Anh sắc bén, giàu sức nặng).`;
+    return metaRespond({ apiKey, input, effort: "low", signal, nodeId: "drafter" });
   }
 };

@@ -102,15 +102,62 @@ function setProfileToForm(p) {
   refreshProfileInsights();
 }
 
+function renderRadarSvg(p) {
+  const svg = $("radarSvg");
+  if (!svg || typeof AgentsV2.computeRadarMetrics !== "function") return;
+  const { axes, overallReadiness } = AgentsV2.computeRadarMetrics(p);
+  const cx = 130, cy = 112, maxR = 72;
+  const n = axes.length;
+  const angleOf = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+  const ptOf = (i, val) => {
+    const r = (Math.max(0, Math.min(100, val)) / 100) * maxR;
+    const a = angleOf(i);
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  };
+
+  let gridHtml = "";
+  for (const lv of [35, 70, 100]) {
+    const pts = axes.map((_, i) => ptOf(i, lv).map(v => v.toFixed(1)).join(",")).join(" ");
+    gridHtml += `<polygon points="${pts}" fill="none" stroke="rgba(148,163,184,0.22)" stroke-width="1"/>`;
+  }
+
+  let axisLines = "";
+  let labelsHtml = "";
+  axes.forEach((ax, i) => {
+    const [x2, y2] = ptOf(i, 100);
+    axisLines += `<line x1="${cx}" y1="${cy}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(148,163,184,0.22)" stroke-width="1"/>`;
+    const [lx, ly] = ptOf(i, 124);
+    const shortLbl = ax.label.split("(")[0].trim();
+    labelsHtml += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" fill="#cbd5e1" font-size="9.5" font-weight="600">${esc(shortLbl)} (${ax.user})</text>`;
+  });
+
+  const targetPts = axes.map((ax, i) => ptOf(i, ax.target).map(v => v.toFixed(1)).join(",")).join(" ");
+  const userPts = axes.map((ax, i) => ptOf(i, ax.user).map(v => v.toFixed(1)).join(",")).join(" ");
+
+  svg.innerHTML = `
+    ${gridHtml}
+    ${axisLines}
+    <polygon points="${targetPts}" fill="rgba(251,191,36,0.08)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <polygon points="${userPts}" fill="rgba(34,211,238,0.28)" stroke="#22d3ee" stroke-width="2.2"/>
+    ${labelsHtml}
+  `;
+
+  if ($("radarLegendText")) {
+    $("radarLegendText").innerHTML = `📊 <b>Chỉ số Sẵn sàng Săn Học bổng (Readiness Score): <span style="color:#22d3ee">${overallReadiness}/100</span></b> &nbsp;·&nbsp; <span style="color:#22d3ee">■ Hồ sơ của bạn</span> vs <span style="color:#fbbf24">┈ Chuẩn Học bổng Toàn phần</span>`;
+  }
+}
+
 function refreshProfileInsights() {
   const p = getProfileFromForm();
   const { strengths, tips } = AgentsV2.analyzeProfileLocal(p);
   const box = $("profileInsights");
-  if (!box) return;
-  box.innerHTML = [
-    ...strengths.map(s => `<span class="insight-pill">${esc(s)}</span>`),
-    ...tips.map(t => `<span class="insight-pill tip">${esc(t)}</span>`),
-  ].join("");
+  if (box) {
+    box.innerHTML = [
+      ...strengths.map(s => `<span class="insight-pill">${esc(s)}</span>`),
+      ...tips.map(t => `<span class="insight-pill tip">${esc(t)}</span>`),
+    ].join("");
+  }
+  renderRadarSvg(p);
 }
 
 function updateKPIs() {
@@ -749,8 +796,9 @@ async function generateStudioForScholarship(idx, apiKeyOverride, signal) {
   if ($("targetScholarshipSelect")) $("targetScholarshipSelect").value = String(idx);
   $("letterFor").textContent = `— Đang chọn: #${idx + 1} ${target.name}`;
 
-  // Cập nhật Checklist tương tác ngay lập tức
+  // Cập nhật Checklist tương tác & Bộ câu hỏi phỏng vấn ngay lập tức
   renderInteractiveChecklist(target);
+  populateInterviewQuestions(target);
 
   const key = normalizeNameKey(target.name);
   if (appState.letterCache[key]) {
@@ -826,18 +874,180 @@ function renderInteractiveChecklist(target) {
   });
 }
 
-// Chuyển đổi Tab trong AI Application Studio
+// Chuyển đổi 4 Tab trong AI Application Studio
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     const targetTab = btn.dataset.tab;
-    ["tab-letter", "tab-checklist"].forEach(tid => {
+    ["tab-letter", "tab-checklist", "tab-interview", "tab-essay"].forEach(tid => {
       const pane = $(tid);
       if (pane) pane.classList.toggle("hidden", tid !== targetTab);
     });
   });
 });
+
+// --- AGENT #11: PHÒNG PHỎNG VẤN AI GIẢ LẬP + THU ÂM GIỌNG NÓI ---
+function populateInterviewQuestions(target) {
+  const sel = $("interviewQuestionSelect");
+  if (!sel || typeof AgentsV2.getInterviewQuestionsForTarget !== "function") return;
+  const qs = AgentsV2.getInterviewQuestionsForTarget(target);
+  sel.innerHTML = qs.map((q, i) => `<option value="${esc(q)}">${esc(q)}</option>`).join("");
+}
+
+if ($("sampleInterviewBtn")) {
+  $("sampleInterviewBtn").onclick = () => {
+    const p = appState.profile || getProfileFromForm();
+    $("interviewUserAnswer").value =
+      `I am applying for this scholarship because it aligns closely with my academic background in ${p.major} (GPA ${p.gpa}/4.0). During my university studies, I led a research project where we solved key technical challenges and won a student research award. After graduating, I plan to return to Vietnam to apply these advanced methodologies to local industry and education.`;
+  };
+}
+
+if ($("voiceRecordBtn")) {
+  $("voiceRecordBtn").onclick = () => {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+      alert("Trình duyệt hiện tại không hỗ trợ Web Speech API trực tiếp. Bạn có thể gõ câu trả lời hoặc bấm '💡 Điền câu trả lời thử nghiệm'.");
+      return;
+    }
+    const rec = new SpeechRec();
+    rec.lang = I18N.currentLang === "vi" ? "vi-VN" : "en-US";
+    rec.interimResults = false;
+    $("voiceRecordBtn").textContent = "🔴 Đang nghe... Hãy nói vào Mic";
+    rec.onresult = (e) => {
+      const transcript = e.results?.[0]?.[0]?.transcript || "";
+      const cur = $("interviewUserAnswer").value.trim();
+      $("interviewUserAnswer").value = cur ? `${cur} ${transcript}` : transcript;
+    };
+    rec.onerror = () => {
+      $("voiceRecordBtn").textContent = "🎤 Trả lời bằng Giọng nói (Mic)";
+    };
+    rec.onend = () => {
+      $("voiceRecordBtn").textContent = "🎤 Trả lời bằng Giọng nói (Mic)";
+    };
+    rec.start();
+  };
+}
+
+if ($("evalInterviewBtn")) {
+  $("evalInterviewBtn").onclick = async () => {
+    const ans = ($("interviewUserAnswer")?.value || "").trim();
+    if (!ans) {
+      $("interviewFeedbackBox").textContent = "⚠️ Hãy nhập câu trả lời phỏng vấn hoặc bấm '💡 Điền câu trả lời thử nghiệm' trước khi chấm điểm.";
+      return;
+    }
+    const target = appState.rankedList[appState.currentTargetIdx] || CURATED_SCHOLARSHIPS_2026_2027[0];
+    const question = $("interviewQuestionSelect")?.value || "Why did you choose this scholarship program?";
+    $("evalInterviewBtn").disabled = true;
+    $("interviewFeedbackBox").textContent = "⏳ Giám khảo AI (Agent #11 · Muse Wonder 1.0) đang phân tích và chấm điểm câu trả lời của bạn theo phương pháp STAR...";
+    try {
+      const vaultKey = typeof CryptoVault !== "undefined" ? await CryptoVault.unlockPersonalKey() : "";
+      const effectiveKey = vaultKey || appState.activeSessionKey || "DEMO";
+      const feedback = await AgentsV2.evaluateInterviewAnswer(
+        effectiveKey,
+        appState.profile || getProfileFromForm(),
+        target,
+        question,
+        ans
+      );
+      $("interviewFeedbackBox").textContent = feedback;
+    } catch (e) {
+      $("interviewFeedbackBox").textContent = "❌ Lỗi khi chấm điểm phỏng vấn: " + e.message;
+    } finally {
+      $("evalInterviewBtn").disabled = false;
+    }
+  };
+}
+
+// --- AGENT #12: CHUYÊN GIA PHẢN BIỆN & NÂNG CẤP BÀI LUẬN (ESSAY CRITIC) ---
+if ($("sampleEssayBtn")) {
+  $("sampleEssayBtn").onclick = () => {
+    const p = appState.profile || getProfileFromForm();
+    $("essayDraftInput").value =
+      `Dear Selection Committee,\nSince I was a child, I have always been passionate about ${p.major}. Throughout my undergraduate studies, I worked very hard and achieved a GPA of ${p.gpa}/4.0 with ${p.english}. I also participated in student research and won an award. I want to apply for this scholarship because your university is very famous and will help me have a good career in the future. After finishing my degree, I will come back to Vietnam to help my country develop.`;
+  };
+}
+
+if ($("reviewEssayBtn")) {
+  $("reviewEssayBtn").onclick = async () => {
+    const draft = ($("essayDraftInput")?.value || "").trim();
+    if (!draft) {
+      $("essayReviewBox").textContent = "⚠️ Hãy dán bản nháp bài luận hoặc bấm '📄 Nạp đoạn bài luận mẫu để thử' trước khi phân tích.";
+      return;
+    }
+    const target = appState.rankedList[appState.currentTargetIdx] || CURATED_SCHOLARSHIPS_2026_2027[0];
+    $("reviewEssayBtn").disabled = true;
+    $("essayReviewBox").textContent = "⏳ Chuyên gia Phản biện Bài luận (Agent #12 · Muse Wonder 1.0) đang chấm điểm 4 tiêu chí, kiểm tra lỗi sáo rỗng (Cliché Check) và viết lại bản nâng cấp...";
+    try {
+      const vaultKey = typeof CryptoVault !== "undefined" ? await CryptoVault.unlockPersonalKey() : "";
+      const effectiveKey = vaultKey || appState.activeSessionKey || "DEMO";
+      const review = await AgentsV2.reviewEssayDraft(
+        effectiveKey,
+        appState.profile || getProfileFromForm(),
+        target,
+        draft
+      );
+      $("essayReviewBox").textContent = review;
+    } catch (e) {
+      $("essayReviewBox").textContent = "❌ Lỗi khi phản biện bài luận: " + e.message;
+    } finally {
+      $("reviewEssayBtn").disabled = false;
+    }
+  };
+}
+
+// --- CHUYỂN ĐỔI GIAO DIỆN SÁNG/TỐI, IN PDF & XUẤT LỊCH .ICS (RFC 5545) ---
+if ($("themeToggleBtn")) {
+  $("themeToggleBtn").onclick = () => {
+    document.body.classList.toggle("light-theme");
+  };
+}
+
+if ($("printPdfBtn")) {
+  $("printPdfBtn").onclick = () => {
+    window.print();
+  };
+}
+
+if ($("exportIcs")) {
+  $("exportIcs").onclick = () => {
+    const list = appState.rankedList.length ? appState.rankedList : CURATED_SCHOLARSHIPS_2026_2027.slice(0, 5);
+    const nowStamp = "20261104T090000Z";
+    const events = list.map((s, idx) => {
+      const dmy = String(s.deadline || "").match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](202\d)/);
+      const dtStr = dmy
+        ? `${dmy[3]}${String(dmy[2]).padStart(2, "0")}${String(dmy[1]).padStart(2, "0")}`
+        : `202701${String(15 + (idx % 12)).padStart(2, "0")}`;
+      const cleanDesc = `To chuc: ${s.org} (${s.country})\\nGia tri: ${s.value}\\nDieu kien: ${s.conditions}\\nLink: ${s.link || ""}`.replace(/[\r\n]+/g, "\\n");
+      return [
+        "BEGIN:VEVENT",
+        `UID:hbh-v4-${idx}-${Date.now()}@hocbonghunter.ai`,
+        `DTSTAMP:${nowStamp}`,
+        `DTSTART;VALUE=DATE:${dtStr}`,
+        `SUMMARY:🎓 Hạn nộp: ${s.name} (${s.score || 90}/100đ)`,
+        `DESCRIPTION:${cleanDesc}`,
+        `URL:${s.link || "https://minhtritm.github.io/hocbong-hunter/"}`,
+        "BEGIN:VALARM",
+        "TRIGGER:-P14D",
+        "ACTION:DISPLAY",
+        "DESCRIPTION:Nhắc nhở trước 14 ngày hạn nộp học bổng",
+        "END:VALARM",
+        "END:VEVENT",
+      ].join("\r\n");
+    });
+
+    const icsContent = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Hoc Bong Hunter v4.0//Multi-Agent Scholarship Calendar//VI",
+      "CALSCALE:GREGORIAN",
+      ...events,
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    triggerDownload("Lich-San-Hoc-Bong-2026-2027.ics", icsContent, "text/calendar;charset=utf-8");
+  };
+}
 
 // --- COPY & XUẤT BÁO CÁO ĐA ĐỊNH DẠNG (JSON, CSV, MARKDOWN) ---
 $("copyLetter").onclick = async () => {

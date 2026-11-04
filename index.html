@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Học Bổng Hunter v3.0 — Hệ Đa Agent & Kiểm Chứng 3 Tầng trên Meta Muse</title>
+<title>Học Bổng Hunter v4.0 — Hệ Đa Agent 12-Node, Kiểm Chứng 3 Tầng &amp; AI Interview Coach</title>
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -16,8 +17,9 @@
       <label for="langSelect" class="sr-only">Language</label>
       <select id="langSelect" title="Chọn ngôn ngữ (50 Languages Supported)"></select>
     </div>
+    <button type="button" id="themeToggleBtn" class="pill-badge" style="cursor:pointer" title="Chuyển đổi giao diện Tối / Sáng">🌓 Giao diện</button>
   </div>
-  <h1><span data-i18n="appTitle">🎯 Học Bổng Hunter</span> <span class="v2badge">v3.0 · 50 Languages</span></h1>
+  <h1><span data-i18n="appTitle">🎯 Học Bổng Hunter</span> <span class="v2badge">v4.0 · 12-Node · 50 Languages</span></h1>
   <p class="subtitle" data-i18n="subtitle">
     Hệ thống Đa Agent săn học bổng thực tế cho sinh viên Việt Nam:
     Profile Analyzer → Supervisor (Muse Wonder 1.0) → 3 Researchers song song (Muse Spark 1.3 + Web Search) →
@@ -27,7 +29,7 @@
   <!-- Thanh chỉ số nhanh -->
   <div class="kpi-strip" id="kpiStrip">
     <div class="kpi-item">
-      <span class="kpi-val" id="kpiAgents">10 Nodes</span>
+      <span class="kpi-val" id="kpiAgents">12 Nodes</span>
       <span class="kpi-lbl" data-i18n="kpiArch">Kiến trúc Đa Agent</span>
     </div>
     <div class="kpi-item">
@@ -194,8 +196,16 @@
       <label><span data-i18n="lblNote">Thành tích / Hoàn cảnh đặc biệt</span> <input id="note" value="Giải Nhì NCKH Sinh viên, 1 bài báo khoa học" placeholder="VD: Giải NCKH, Hackathon, hộ nghèo..."></label>
     </div>
 
-    <!-- Đánh giá nhanh hồ sơ từ Profile Analyzer -->
-    <div id="profileInsights" class="profile-insights"></div>
+    <!-- Đánh giá nhanh hồ sơ + Biểu đồ Radar SVG 5 Trục (Gap Analysis) -->
+    <div class="profile-radar-wrap">
+      <div class="profile-insights-col">
+        <div id="profileInsights" class="profile-insights"></div>
+        <div id="radarLegendText" class="hint"></div>
+      </div>
+      <div class="radar-svg-col">
+        <svg id="radarSvg" viewBox="0 0 260 220" role="img" aria-label="Biểu đồ Radar 5 trục năng lực hồ sơ"></svg>
+      </div>
+    </div>
 
     <div class="action-buttons-row">
       <button id="hunt" class="primary" type="button" data-i18n="huntBtn">🚀 Săn Học Bổng Ngay (Multi-Agent Pipeline)</button>
@@ -224,9 +234,11 @@
       <h2><span data-i18n="resultsTitle">🏆 Học Bổng Đã Qua Kiểm Chứng</span> <span class="hint" id="resultsSummaryCount"></span></h2>
       <div class="export-bar">
         <button type="button" class="sm-btn" id="openCompareBtn">⚖️ So sánh (<span id="compareCount">0</span>)</button>
+        <button type="button" class="sm-btn" id="exportIcs" title="Xuất lịch hạn nộp chuẩn iCalendar cho Google Calendar / Apple Calendar / Outlook">📅 Lịch (.ICS)</button>
         <button type="button" class="sm-btn" id="exportJson">⬇️ JSON</button>
         <button type="button" class="sm-btn" id="exportCsv">📊 CSV (Excel)</button>
         <button type="button" class="sm-btn" id="exportMd">📝 Báo cáo .MD</button>
+        <button type="button" class="sm-btn" id="printPdfBtn" title="In hoặc Lưu báo cáo PDF chuẩn trang A4">🖨️ In / PDF</button>
       </div>
     </div>
 
@@ -262,23 +274,57 @@
       </div>
     </div>
 
-    <!-- Tabs chuyển đổi giữa Bài luận & Checklist tương tác -->
+    <!-- 4 Tabs chuyển đổi: Bài luận, Checklist, Phòng Phỏng Vấn AI & Chấm Điểm Bài Luận -->
     <div class="studio-tabs">
-      <button type="button" class="tab-btn active" data-tab="tab-letter">📝 Motivation Letter, Lộ trình & Phỏng vấn</button>
-      <button type="button" class="tab-btn" data-tab="tab-checklist">✅ Checklist Hồ sơ Cá nhân hóa (<span id="chkProgressText">0/8</span>)</button>
+      <button type="button" class="tab-btn active" data-tab="tab-letter">📝 Motivation Letter &amp; Lộ trình</button>
+      <button type="button" class="tab-btn" data-tab="tab-checklist">✅ Checklist Hồ sơ (<span id="chkProgressText">0/8</span>)</button>
+      <button type="button" class="tab-btn" data-tab="tab-interview">🎙️ Phòng Phỏng Vấn AI (Agent #11)</button>
+      <button type="button" class="tab-btn" data-tab="tab-essay">🔬 Chấm &amp; Sửa Bài Luận (Agent #12)</button>
     </div>
 
     <div id="tab-letter" class="tab-pane">
       <div id="letter" class="letter"></div>
       <div class="row" style="margin-top:14px">
-        <button id="copyLetter" type="button">📋 Copy toàn bộ dàn ý</button>
-        <button id="downloadLetterMd" type="button">⬇️ Tải Dàn ý (.md)</button>
+        <button id="copyLetter" type="button" data-i18n="copyBtn">📋 Copy toàn bộ dàn ý</button>
+        <button id="downloadLetterMd" type="button" data-i18n="dlMdBtn">⬇️ Tải Dàn ý (.md)</button>
       </div>
     </div>
 
     <div id="tab-checklist" class="tab-pane hidden">
       <p class="hint">Đánh dấu các giấy tờ bạn đã chuẩn bị. Trạng thái được lưu tự động trong trình duyệt cho từng học bổng.</p>
       <div id="checklistBox" class="checklist-box"></div>
+    </div>
+
+    <!-- Tab 3: Phòng Phỏng Vấn Học Bổng Giả Lập + Thu Âm Giọng Nói (Agent #11) -->
+    <div id="tab-interview" class="tab-pane hidden">
+      <p class="hint">
+        <b>🎙️ AI Mock Interview Coach (Muse Wonder 1.0):</b> Chọn câu hỏi phỏng vấn của Hội đồng tuyển chọn, bấm <b>🎤 Trả lời bằng Giọng nói</b> (hoặc gõ văn bản) để Giám khảo AI chấm điểm theo chuẩn <b>STAR (0–100)</b> và gợi ý câu trả lời mẫu điểm 10!
+      </p>
+      <label>Câu hỏi từ Hội đồng Phỏng vấn
+        <select id="interviewQuestionSelect"></select>
+      </label>
+      <label style="margin-top:10px">Câu trả lời của bạn (Tiếng Anh hoặc Tiếng Việt)
+        <textarea id="interviewUserAnswer" rows="4" placeholder="Nhập câu trả lời của bạn hoặc bấm nút 🎤 Thu âm giọng nói bên dưới..."></textarea>
+      </label>
+      <div class="row" style="margin-top:10px">
+        <button type="button" id="voiceRecordBtn" class="sm-btn">🎤 Trả lời bằng Giọng nói (Mic)</button>
+        <button type="button" id="sampleInterviewBtn" class="sm-btn">💡 Điền câu trả lời thử nghiệm</button>
+        <button type="button" id="evalInterviewBtn" class="primary" style="width:auto;padding:10px 20px;font-size:0.95rem">🎯 Giám khảo AI Chấm Điểm &amp; Sửa (STAR)</button>
+      </div>
+      <div id="interviewFeedbackBox" class="letter" style="margin-top:14px">Chưa có đánh giá. Hãy nhập câu trả lời và bấm "🎯 Giám khảo AI Chấm Điểm &amp; Sửa (STAR)".</div>
+    </div>
+
+    <!-- Tab 4: Chuyên Gia Phản Biện & Nâng Cấp Bài Luận (Agent #12) -->
+    <div id="tab-essay" class="tab-pane hidden">
+      <p class="hint">
+        <b>🔬 AI Essay Critic &amp; Rewriter (Muse Wonder 1.0):</b> Dán đoạn nháp Motivation Letter / Study Plan của bạn vào đây để Agent chấm điểm 4 tiêu chí học thuật, bắt lỗi sáo rỗng (cliché) và viết lại bản nâng cấp chuẩn Học bổng Toàn phần.
+      </p>
+      <textarea id="essayDraftInput" rows="5" placeholder="Dán bản nháp bài luận (Motivation Letter / Personal Statement) của bạn vào đây..."></textarea>
+      <div class="row" style="margin-top:10px">
+        <button type="button" id="sampleEssayBtn" class="sm-btn">📄 Nạp đoạn bài luận mẫu để thử</button>
+        <button type="button" id="reviewEssayBtn" class="primary" style="width:auto;padding:10px 20px;font-size:0.95rem">🔬 Phản Biện, Chấm Điểm &amp; Viết Lại</button>
+      </div>
+      <div id="essayReviewBox" class="letter" style="margin-top:14px">Chưa có kết quả phản biện. Hãy dán bản nháp bài luận và bấm nút phân tích.</div>
     </div>
   </section>
 

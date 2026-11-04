@@ -1411,6 +1411,36 @@ async function simulateMetaResponse({ input, webSearch, nodeId, signal }) {
     );
   }
 
+  if (input.includes("Interview Evaluator Agent")) {
+    return `🎯 ĐIỂM SỐ PHỎNG VẤN: 88 / 100 — Triển vọng Rất Tốt (Strong Candidate)
+
+✅ ĐIỂM MẠNH ĐÃ THỂ HIỆN:
+• Thể hiện rõ đam mê chuyên môn và kết nối được mục tiêu cá nhân với giá trị cốt lõi của học bổng.
+• Cấu trúc trả lời mạch lạc, có định hướng đóng góp sau khi tốt nghiệp.
+
+⚠️ ĐIỂM CẦN CẢI THIỆN (THEO CHUẨN STAR):
+• Phần Result (Kết quả) cần bổ sung con số định lượng cụ thể (VD: tăng hiệu suất bao nhiêu %, quy mô bao nhiêu người hưởng lợi).
+• Cần nhắc trực tiếp đến tên 01 nhóm nghiên cứu hoặc định hướng chiến lược của đơn vị cấp học bổng.
+
+🌟 CÂU TRẢ LỜI MẪU ĐIỂM 10 (MODEL ANSWER — ENGLISH):
+"What draws me specifically to this program is its unique convergence of frontier research and real-world deployment. During my third year, when leading a 4-member student research team (Situation & Task), I redesigned our data pipeline to overcome hardware constraints (Action), achieving a 35% accuracy gain and winning Second Prize at the University Scientific Research Contest (Result). With this scholarship, I aim to scale this methodology and contribute directly to Vietnam's digital transformation within 3 years of graduation."`;
+  }
+
+  if (input.includes("Essay Critic & Rewriter Agent")) {
+    return `📊 1. BẢNG ĐIỂM PHẢN BIỆN BÀI LUẬN (OVERALL: 86 / 100)
+• Opening Hook & Storytelling: 84/100 (Mở đầu rõ ràng nhưng có thể tạo ấn tượng mạnh hơn bằng một tình huống thực tế).
+• Academic & Research Fit: 90/100 (Nêu bật tốt nền tảng GPA và định hướng chuyên ngành).
+• Leadership & Social Impact: 85/100 (Có tầm nhìn đóng góp nhưng cần cụ thể hóa lộ trình).
+• Clarity, Tone & Originality: 85/100 (Ngữ pháp chuẩn, cần thay thế một số động từ chung chung bằng động từ học thuật mạnh).
+
+🔍 2. PHÁT HIỆN CÂU TỪ SÁO RỖNG (CLICHÉ CHECK):
+• Tránh dùng câu mở đầu chung chung như "Since I was a child, I have always been passionate about..." → Hãy đi thẳng vào một bài toán nghiên cứu hoặc dự án thực tế bạn đã giải quyết.
+• Thay vì chỉ viết "I worked hard and got a high GPA", hãy gắn GPA với năng lực tư duy hệ thống và công bố khoa học.
+
+✨ 3. BẢN VIẾT LẠI NÂNG CẤP CHUẨN HỌC THUẬT (POLISHED VERSION):
+"Confronting real-world computational bottlenecks during my undergraduate research ignited my commitment to advancing intelligent systems. Maintaining a rigorous academic standing while spearheading applied research projects has equipped me with both theoretical depth and engineering resilience. Through this fellowship, I seek to collaborate with leading faculty to translate scalable AI research into measurable socioeconomic impact for Vietnam."`;
+  }
+
   if (nodeId === "drafter" || input.includes("DÀN Ý thư động lực")) {
     return `=== 1. MOTIVATION LETTER OUTLINE (BẢN TIẾNG ANH HỌC THUẬT & GỢI Ý CÁ NHÂN HÓA) ===
 

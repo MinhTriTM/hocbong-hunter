@@ -410,12 +410,78 @@ select option { background: var(--bg2); color: var(--ink); }
   transform: translateY(-1px);
 }
 
-/* Profile Insights */
+/* Profile Insights & 5-Axis SVG Radar Chart */
+.profile-radar-wrap {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+}
+@media (max-width: 680px) {
+  .profile-radar-wrap { grid-template-columns: 1fr; }
+}
+.radar-svg-col {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+#radarSvg {
+  width: 100%;
+  max-width: 250px;
+  height: auto;
+}
 .profile-insights {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+}
+
+/* Light Theme Mode */
+body.light-theme {
+  --bg: #f1f5f9;
+  --bg2: #e2e8f0;
+  --card: rgba(255, 255, 255, 0.88);
+  --card-border: rgba(15, 23, 42, 0.12);
+  --ink: #0f172a;
+  --muted: #475569;
+  color: var(--ink);
+}
+body.light-theme input,
+body.light-theme select,
+body.light-theme textarea {
+  background: #ffffff;
+  color: #0f172a;
+}
+body.light-theme label,
+body.light-theme .sch h3,
+body.light-theme .kpi-val {
+  color: #0f172a;
+}
+body.light-theme .letter,
+body.light-theme .verify-box {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+/* Print / Save as PDF A4 Formatting */
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  #key-card, .preset-bar, .cv-parser-drawer, .action-buttons-row, .filter-bar, .export-bar, .sch-actions, .studio-tabs, footer, #themeToggleBtn, .lang-switcher {
+    display: none !important;
+  }
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    background: #fff !important;
+    color: #000 !important;
+    break-inside: avoid;
+  }
 }
 .insight-pill {
   font-size: 0.82rem;

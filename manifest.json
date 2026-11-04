@@ -1,0 +1,10 @@
+{
+  "name": "Học Bổng Hunter v4.0 — Multi-Agent AI Scholarship System",
+  "short_name": "Học Bổng Hunter",
+  "description": "Hệ thống 12-Node Đa Agent săn học bổng quốc tế, kiểm chứng 3 tầng, phỏng vấn AI & phản biện bài luận trên Meta Muse.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#070b16",
+  "theme_color": "#6c8cff",
+  "orientation": "portrait-primary"
+}

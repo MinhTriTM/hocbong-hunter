@@ -177,13 +177,19 @@ vm.runInContext(
   assert(ranked[0].score >= ranked[ranked.length - 1].score, "Matcher sắp xếp điểm không đúng thứ tự giảm dần.");
   assert(ranked[0].subScores && typeof ranked[0].subScores.major === "number", "Thiếu 4 chỉ số subScores.");
 
-  // Node 10: Strategic Drafter & Checklist
+  // Node 10, 11, 12: Strategic Drafter, Checklist, AI Interview Evaluator (#11) & Essay Critic (#12)
   const letter = await AgentsV2.draftLetter("DEMO", sampleProfile, ranked[0]);
   assert(letter.includes("MOTIVATION LETTER") && letter.length > 400, "Drafter tạo dàn ý thư quá ngắn hoặc sai cấu trúc.");
   const checklist = AgentsV2.buildInteractiveChecklist(sampleProfile, ranked[0]);
   assert(checklist.length >= 8, "Checklist tạo thiếu mục hồ sơ.");
+  const radar = AgentsV2.computeRadarMetrics(sampleProfile);
+  assert(radar.axes.length === 5 && radar.overallReadiness > 50, "Radar 5 trục tính toán lỗi.");
+  const interviewEval = await AgentsV2.evaluateInterviewAnswer("DEMO", sampleProfile, ranked[0], "Why this program?", "Sample answer");
+  assert(interviewEval.includes("STAR") && interviewEval.length > 100, "Agent #11 (Interview Evaluator) phản hồi lỗi.");
+  const essayRev = await AgentsV2.reviewEssayDraft("DEMO", sampleProfile, ranked[0], "Sample draft essay");
+  assert(essayRev.includes("CLICHÉ") && essayRev.length > 100, "Agent #12 (Essay Critic) phản hồi lỗi.");
 
-  console.log(`✅ [Check 6/6] E2E 10-Node Pipeline: Duyệt ${approved.length} học bổng thật, chặn ${rejected.length} học bổng giả/cũ, Top 1 = ${ranked[0].score}/100 điểm.`);
+  console.log(`✅ [Check 6/6] E2E 12-Node Pipeline: Duyệt ${approved.length} học bổng thật, chặn ${rejected.length} học bổng giả/cũ, Top 1 = ${ranked[0].score}/100đ, Radar + Interview (#11) + Essay (#12) PASS!`);
   console.log("📊 Telemetry:", usageHint());
   console.log("=================================================================");
   console.log("🎉 TẤT CẢ KIỂM ĐỊNH CI/CD ĐỀU ĐẠT CHUẨN 100%!");
