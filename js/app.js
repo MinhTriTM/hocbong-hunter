@@ -1234,9 +1234,9 @@ function triggerPitchChoreography(action) {
     const keyCard = $("key-card");
     if (keyCard) keyCard.scrollIntoView({ behavior: "smooth", block: "center" });
   } else if (action === "select_preset_and_radar") {
-    const presetBtn = document.querySelector('.preset-btn[data-preset="uk_chevening"]') || document.querySelector(".preset-btn");
+    const presetBtn = document.querySelector('.chip-btn[data-preset="stem-phd"]') || document.querySelector(".chip-btn");
     if (presetBtn) presetBtn.click();
-    const radarCard = $("radarChartBox");
+    const radarCard = $("radarSvg");
     if (radarCard) radarCard.scrollIntoView({ behavior: "smooth", block: "center" });
   } else if (action === "run_pipeline_and_inspect") {
     const flowCard = $("pipeline-card");
@@ -1260,16 +1260,18 @@ function triggerPitchChoreography(action) {
   } else if (action === "run_studio_interview_and_essay") {
     const letterCard = $("letter-card");
     if (letterCard) letterCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    const tabIntBtn = document.querySelector('.tab-btn[data-tab="tab-interview"]');
+    if (tabIntBtn) tabIntBtn.click();
     setTimeout(() => {
-      if ($("interviewAnswer") && !$("interviewAnswer").value.trim()) {
-        $("interviewAnswer").value = "During my junior year at HUST, our hospital AI triage project faced a severe data imbalance (Situation). As team lead, I needed to boost minority class recall above 90% within two weeks (Task). I designed a synthetic augmentation pipeline and collaborated with three doctors to audit edge cases (Action). As a result, our F1-score improved from 78% to 94.6% and won First Prize at the National Student Research Awards (Result).";
-      }
+      if ($("sampleInterviewBtn")) $("sampleInterviewBtn").click();
       if ($("evalInterviewBtn")) $("evalInterviewBtn").click();
-    }, 2000);
+    }, 1500);
     setTimeout(() => {
+      const tabEssayBtn = document.querySelector('.tab-btn[data-tab="tab-essay"]');
+      if (tabEssayBtn) tabEssayBtn.click();
       if ($("sampleEssayBtn")) $("sampleEssayBtn").click();
       if ($("reviewEssayBtn")) $("reviewEssayBtn").click();
-    }, 7000);
+    }, 7500);
   }
 }
 
